@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyzátor Tržního Biasu (Demo)</title>
+    <!-- Import Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Přidání Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <!-- Import Ikon (Heroicons) -->
+    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+    <style>
+        /* Použití písma Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Plynulé přechody pro prvky */
+        .transition-all {
+            transition: all 0.3s ease-in-out;
+        }
+        /* Styly pro "gauge" (ukazatel skóre) */
+        .gauge-container {
+            width: 300px;
+            height: 150px;
+            position: relative;
+            overflow: hidden;
+        }
+        .gauge-semi-circle {
+            width: 300px;
+            height: 150px;
+            border: 25px solid #e0e0e0;
+            border-bottom-color: transparent;
+            border-radius: 150px 150px 0 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            box-sizing: border-box;
+        }
+        .gauge-fill {
+            width: 300px;
+            height: 150px;
+            border: 25px solid #ccc;
+            border-bottom-color: transparent;
+            border-radius: 150px 150px 0 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            box-sizing: border-box;
+            transform-origin: center bottom;
+            transition: transform 0.5s ease-in-out;
+        }
+        .gauge-text {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-gray-800 p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-2xl mx-auto">
+        
+        <!-- Hlavička -->
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-white">Analyzátor Tržního Biasu</h1>
+            <span class="text-xs font-medium bg-yellow-600 text-white px-3 py-1 rounded-full">DEMO</span>
+        </div>
+
+        <!-- Upozornění -->
+        <div class="bg-yellow-800 border-l-4 border-yellow-500 text-yellow-100 p-4 rounded-lg mb-6" role="alert">
+            <p class="font-bold">Upozornění</p>
+            <p class="text-sm">Tato aplikace je pouze technickou demonstrací a nepoužívá reálná tržní data. Nejedná se o finanční poradenství.</p>
+        </div>
+
+        <!-- Výběr trhu -->
+        <div class="mb-6">
+            <label for="market-select" class="block text-sm font-medium text-gray-300 mb-2">Vyberte trh:</label>
+            <select id="market-select" class="w-full bg-gray-700 border border-gray-600 text-white text-lg rounded-lg focus:ring-blue-500 focus:border-blue-500 p-3">
+                <option value="eurusd">EUR/USD</option>
+                <option value="gold">Zlato (Gold)</option>
+                <option value="sp500">Akcie (S&P 500)</option>
+                <option value="crypto">Kryptoměny (BTC)</option>
+            </select>
+        </div>
+
+        <!-- Výsledné skóre a Gauge -->
+        <div class="bg-gray-900 rounded-xl p-6 mb-6 flex flex-col items-center">
+            <h2 class="text-xl font-semibold text-gray-400 mb-2">Celkové Skóre Trhu</h2>
+            
+            <div class="gauge-container mb-2">
+                <div class="gauge-semi-circle"></div>
+                <div id="gauge-fill" class="gauge-fill"></div>
+                <div class="gauge-text">
+                    <span id="score-value" class="text-4xl font-bold">0</span>
+                    <span class="text-sm text-gray-400">/ 100</span>
+                </div>
+            </div>
+            
+            <div id="bias-result" class="text-3xl font-bold text-center p-3 rounded-lg transition-all">&mdash;</div>
+        </div>
+
+        <!-- Detailní komponenty skóre -->
+        <h3 class="text-lg font-semibold text-gray-300 mb-4">Komponenty Skóre:</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <!-- Karta 1: Sezonalita -->
+            <div class="bg-gray-700 p-5 rounded-lg shadow-lg">
+                <div class="flex items-center mb-2">
+                    <ion-icon name="calendar-outline" class="text-blue-400 text-2xl mr-3"></ion-icon>
+                    <h4 class="text-lg font-semibold">Sezonalita</h4>
+                </div>
+                <p class="text-xs text-gray-400 -mt-2 mb-2">(průměr za 2 roky)</p>
+                <p id="seasonal-bias" class="text-2xl font-bold">&mdash;</p>
+                <p id="seasonal-score" class="text-sm text-gray-400">Skóre: 0</p>
+            </div>
+            
+            <!-- Karta 2: COT Report -->
+            <div class="bg-gray-700 p-5 rounded-lg shadow-lg">
+                <div class="flex items-center mb-2">
+                    <ion-icon name="business-outline" class="text-green-400 text-2xl mr-3"></ion-icon>
+                    <h4 class="text-lg font-semibold">COT Report</h4>
+                </div>
+                <p id="cot-bias" class="text-2xl font-bold">&mdash;</p>
+                <p id="cot-score" class="text-sm text-gray-400">Skóre: 0</p>
+            </div>
+
+            <!-- Karta 3: Momentum -->
+            <div class="bg-gray-700 p-5 rounded-lg shadow-lg">
+                <div class="flex items-center mb-2">
+                    <ion-icon name="trending-up-outline" class="text-red-400 text-2xl mr-3"></ion-icon>
+                    <h4 class="text-lg font-semibold">Momentum</h4>
+                </div>
+                <p id="momentum-bias" class="text-2xl font-bold">&mdash;</p>
+                <p id="momentum-score" class="text-sm text-gray-400">Skóre: 0</p>
+            </div>
+
+        </div>
+
+        <!-- Historie Skóre -->
+        <div class="mt-8 bg-gray-900 rounded-xl p-6">
+            <h3 class="text-lg font-semibold text-gray-300 mb-4">Historie Skóre (90 dní)</h3>
+            <div class="h-64 md:h-80">
+                <canvas id="historyChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Simulovaná Databáze ---
+        // Zde simulujeme data, která by v reálné aplikaci přicházela z API.
+        const mockMarketData = {
+            "eurusd": {
+                "seasonal": { "bias": "Býčí", "score": 30 }, // Silná sezónní tendence k růstu
+                "cot": { "bias": "Extrém. Nákupy", "score": 40 }, // Fondy silně nakupují
+                "momentum": { "bias": "Růstové", "score": 20 }, // Trh již roste
+                "history": [-10, -5, 0, -2, 5, 8, 10, 5, 8, 12, 10, 15, 12, 10, 8, 5, 10, 12, 15, 18, 20, 22, 25, 20, 22, 24, 20, 18, 20, 25, 22, 20, 18, 15, 12, 10, 8, 10, 12, 15, 10, 12, 10, 15, 18, 20, 25, 22, 20, 15, 10, 12, 15, 18, 20, 22, 25, 28, 30, 28, 10, 15, 20, 25, 30, 25, 30, 32, 28, 30, 33, 30, 32, 35, 38, 40, 35, 40, 50, 45, 55, 60, 70, 65, 75, 80, 85, 80, 88, 90] // 90 dní
+            },
+            "gold": {
+                "seasonal": { "bias": "Neutrální", "score": 0 },
+                "cot": { "bias": "Extrém. Prodeje", "score": -40 }, // Fondy silně prodávají
+                "momentum": { "bias": "Klesající", "score": -30 }, // Trh klesá
+                "history": [20, 15, 10, 12, 8, 5, 0, -2, 5, 0, -5, -2, 0, 5, 8, 10, 5, 2, 0, -2, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, -5, -8, -10, -5, -8, -10, -12, -15, -10, -8, -5, -2, 0, -2, -5, -8, -10, -12, -15, -10, -5, -10, -10, -15, -20, -18, -15, -12, -10, -15, -18, -20, -22, -25, -20, -18, -20, -25, -30, -35, -40, -50, -45, -55, -60, -65, -70, -65, -75, -70] // 90 dní
+            },
+            "sp500": {
+                "seasonal": { "bias": "Býčí", "score": 20 },
+                "cot": { "bias": "Neutrální", "score": 0 },
+                "momentum": { "bias": "Silně Růstové", "score": 30 },
+                "history": [-20, -15, -10, -12, -8, -5, 0, -2, 0, 5, 2, 0, -2, -5, -8, -10, -5, -2, 0, 2, 5, 8, 5, 2, 0, -2, 0, 2, 5, 8, 10, 12, 10, 8, 5, 2, 0, 2, 5, 8, 10, 12, 15, 10, 8, 5, 2, 0, 5, 8, 10, 12, 15, 18, 20, 15, 10, 8, 5, 2, 5, 8, 10, 12, 15, 12, 10, 14, 18, 20, 15, 12, 10, 8, 10, 12, 10, 15, 20, 25, 30, 25, 35, 40, 45, 50, 45, 48, 52, 50] // 90 dní
+            },
+            "crypto": {
+                "seasonal": { "bias": "Slabě Býčí", "score": 10 },
+                "cot": { "bias": "Extrém. Nákupy", "score": 30 }, // Data z futures (pokud existují)
+                "momentum": { "bias": "Neutrální", "score": 0 },
+                "history": [5, 0, -5, 0, 5, 10, 15, 10, 5, 0, 5, 10, 12, 8, 5, 10, 15, 12, 10, 8, 10, 15, 20, 15, 10, 5, 0, 5, 10, 15, 12, 10, 8, 10, 12, 15, 18, 20, 15, 12, 10, 8, 5, 10, 15, 12, 10, 5, 0, 5, 10, 15, 18, 20, 25, 20, 15, 10, 5, 10, 10, 12, 15, 10, 8, 5, 10, 15, 12, 10, 5, 8, 10, 12, 15, 20, 5, 10, 15, 20, 15, 25, 30, 35, 40, 30, 35, 45, 42, 40] // 90 dní
+            }
+        };
+
+        // --- Elementy v DOM ---
+        const marketSelect = document.getElementById('market-select');
+        const scoreValue = document.getElementById('score-value');
+        const biasResult = document.getElementById('bias-result');
+        const gaugeFill = document.getElementById('gauge-fill');
+        
+        const seasonalBiasEl = document.getElementById('seasonal-bias');
+        const seasonalScoreEl = document.getElementById('seasonal-score');
+        const cotBiasEl = document.getElementById('cot-bias');
+        const cotScoreEl = document.getElementById('cot-score');
+        const momentumBiasEl = document.getElementById('momentum-bias');
+        const momentumScoreEl = document.getElementById('momentum-score');
+
+        let historyChartInstance = null; // Proměnná pro instanci grafu
+
+        // --- Hlavní Funkce ---
+
+        /**
+         * Vypočítá celkové skóre a vrátí textový popis biasu.
+         */
+        function calculateTotalScore(data) {
+            // Jednoduché sečtení skóre z jednotlivých komponent
+            const totalScore = data.seasonal.score + data.cot.score + data.momentum.score;
+            
+            let biasText = "Neutrální";
+            let biasColor = "text-gray-300";
+
+            if (totalScore > 70) {
+                biasText = "Silný Nákup";
+                biasColor = "text-green-400";
+            } else if (totalScore > 30) {
+                biasText = "Nákup";
+                biasColor = "text-green-300";
+            } else if (totalScore < -70) {
+                biasText = "Silný Prodej";
+                biasColor = "text-red-400";
+            } else if (totalScore < -30) {
+                biasText = "Prodej";
+                biasColor = "text-red-300";
+            }
+
+            return { score: totalScore, text: biasText, color: biasColor };
+        }
+
+        /**
+         * Aktualizuje "gauge" (ukazatel skóre) v UI.
+         */
+        function updateGauge(score) {
+            // Převede skóre z -100 na 100 na rotaci 0-180 stupňů
+            const normalizedScore = (score + 100) / 200; // Normalizace na 0-1
+            const rotation = normalizedScore * 180; // Převedení na stupně (0-180)
+            
+            let color = "#e0e0e0"; // Šedá (neutrální)
+            if (score > 30) color = "#22c55e"; // Zelená
+            if (score < -30) color = "#ef4444"; // Červená
+
+            gaugeFill.style.transform = `rotate(${rotation}deg)`;
+            gaugeFill.style.borderColor = color;
+            gaugeFill.style.borderBottomColor = 'transparent';
+        }
+
+        /**
+         * Vytvoří popisky dat pro graf (posledních 14 dní).
+         */
+        function createDateLabels() {
+            const labels = [];
+            // Použijeme pevné datum pro konzistenci dema
+            const today = new Date("2025-10-27T19:45:00"); 
+            for (let i = 89; i >= 0; i--) { // Změna z 29 na 89 (pro 90 dní)
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                labels.push(`${date.getDate()}.${date.getMonth() + 1}.`);
+            }
+            return labels;
+        }
+
+        /**
+         * Vykreslí historický graf skóre.
+         */
+        function drawHistoryChart(historyData, dateLabels) {
+            if (historyChartInstance) {
+                historyChartInstance.destroy(); // Zničit starý graf před kreslením nového
+            }
+            
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            
+            // Funkce pro určení barvy čáry
+            const getLineColor = (data) => {
+                const lastValue = data[data.length - 1];
+                if (lastValue > 30) return '#22c55e'; // Zelená
+                if (lastValue < -30) return '#ef4444'; // Červená
+                return '#9ca3af'; // Šedá
+            };
+            
+            const lineColor = getLineColor(historyData);
+
+            historyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dateLabels,
+                    datasets: [{
+                        label: 'Celkové Skóre',
+                        data: historyData,
+                        borderColor: lineColor,
+                        backgroundColor: lineColor + '33', // Průhledná výplň
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: -100,
+                            max: 100,
+                            ticks: {
+                                color: '#9ca3af' // Barva popisků osy Y
+                            },
+                            grid: {
+                                color: '#4b5563' // Barva mřížky
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#9ca3af' // Barva popisků osy X
+                            },
+                            grid: {
+                                display: false // Skrýt mřížku osy X
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false // Skrýt legendu
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `Skóre: ${context.formattedValue}`;
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        /**
+         * Aktualizuje celé UI na základě vybraného trhu.
+         */
+        function updateDashboard() {
+            const selectedMarket = marketSelect.value;
+            const data = mockMarketData[selectedMarket];
+
+            if (!data) return;
+
+            // 1. Vypočítat celkové skóre
+            const total = calculateTotalScore(data);
+
+            // 2. Aktualizovat celkové skóre a text
+            scoreValue.textContent = total.score;
+            biasResult.textContent = total.text;
+            biasResult.className = `text-3xl font-bold text-center p-3 rounded-lg transition-all ${total.color}`;
+            
+            // 3. Aktualizovat gauge
+            updateGauge(total.score);
+
+            // 4. Aktualizovat jednotlivé karty
+            seasonalBiasEl.textContent = data.seasonal.bias;
+            seasonalScoreEl.textContent = `Skóre: ${data.seasonal.score}`;
+            setElementColor(seasonalBiasEl, data.seasonal.score);
+            
+            cotBiasEl.textContent = data.cot.bias;
+            cotScoreEl.textContent = `Skóre: ${data.cot.score}`;
+            setElementColor(cotBiasEl, data.cot.score);
+
+            momentumBiasEl.textContent = data.momentum.bias;
+            momentumScoreEl.textContent = `Skóre: ${data.momentum.score}`;
+            setElementColor(momentumBiasEl, data.momentum.score);
+
+            // 5. Vytvořit popisky dat a vykreslit graf
+            const dateLabels = createDateLabels();
+            drawHistoryChart(data.history, dateLabels);
+        }
+
+        /**
+         * Pomocná funkce pro nastavení barvy textu podle skóre.
+         */
+        function setElementColor(element, score) {
+            element.classList.remove("text-green-400", "text-red-400", "text-gray-300");
+            if (score > 0) {
+                element.classList.add("text-green-400");
+            } else if (score < 0) {
+                element.classList.add("text-red-400");
+            } else {
+                element.classList.add("text-gray-300");
+            }
+        }
+
+        // --- Event Listeners ---
+        
+        // Při změně v dropdownu aktualizovat dashboard
+        marketSelect.addEventListener('change', updateDashboard);
+        
+        // Načíst data pro první položku při startu
+        document.addEventListener('DOMContentLoaded', updateDashboard);
+
+    </script>
+</body>
+</html>
+
+
+
+
