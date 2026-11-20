@@ -11,8 +11,9 @@ Confidence levels:
 
 | Item | Value | |
 |---|---|---|
-| Target framework | `net10.0` (ATAS X). Older ATAS builds use `net8.0` | ✅ |
+| Target framework | **`net8.0`** (overridable via `-p:AtasTfm=`). The user's ATAS ships `OFT.Rendering` compiled against System.Drawing.Common **8.0**, and a net8.0 DLL also loads in a .NET 10 host. | ✅ confirmed by the user's build |
 | References (Private=false) | `ATAS.Indicators.dll`, `ATAS.DataFeedsCore.dll`, `OFT.Rendering.dll`, `OFT.Attributes.dll`, `Utils.Common.dll` | ✅ |
+| **System.Drawing.Common** | **Required.** Without it you get `CS0012: DashStyle is defined in an assembly that is not referenced` as soon as you use `RenderPen`/`RenderFont`. Reference ATAS's own copy if present, else `PackageReference System.Drawing.Common 8.0.x` with `ExcludeAssets="runtime"`. The template csproj does this. | ✅ confirmed by the user's build |
 | DLL folder, Windows | `C:\Program Files (x86)\ATAS Platform\` | ✅ |
 | DLL folder, macOS | `/Applications/ATAS X.app/Contents/MonoBundle/` | ✅ |
 | Install DLL, Windows | `%APPDATA%\ATAS\Indicators\` | ✅ |

@@ -47,7 +47,7 @@ cd atas/WickAbsorption
 dotnet build -c Release
 ```
 
-Výsledný `bin/Release/net10.0/WickAbsorption.dll` zkopírujte do `%APPDATA%\ATAS\Indicators\` (Windows) nebo `~/Library/Application Support/ATAS/Indicators/` (macOS) a restartujte ATAS.
+Výsledný `bin/Release/net8.0/WickAbsorption.dll` zkopírujte do `%APPDATA%\ATAS\Indicators\` (Windows) nebo `~/Library/Application Support/ATAS/Indicators/` (macOS) a restartujte ATAS.
 
 Indikátor potřebuje footprint data, tedy objem po cenových úrovních. Ty ATAS má u běžných grafů z tickových dat.
 
