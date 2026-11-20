@@ -53,8 +53,6 @@ Výsledný `bin/Release/net10.0/DeltaStrengthBar.dll` zkopírujte do složky ind
 
 Restartujte ATAS. Indikátor najdete pod názvem **Delta Strength Bar**.
 
-**Alternativa bez SDK:** v ATAS otevřete *Indicators → editor* a vložte obsah `DeltaStrengthBar.cs`.
-
 ## Poznámky
 
 - Kreslí se ve vrstvě `Final` v hlavním cenovém panelu. Výška pruhu je v pixelech a nemění se se zoomem ceny.

@@ -4,15 +4,16 @@
     Build:  dotnet build -c Release
     Output: bin/Release/<tfm>/DeltaStrengthBar.dll  -> copy to the ATAS Indicators folder.
 
-    ATAS X currently ships on .NET 10. If your ATAS build is older, change
-    TargetFramework to match it (e.g. net8.0).
+    ATAS X currently ships on .NET 10. If your ATAS build is older, build with
+      dotnet build -c Release -p:AtasTfm=net8.0
 
     The ATAS DLL folder is auto-detected for default installs. Override with:
       dotnet build -c Release -p:AtasDir="D:\ATAS Platform"
   -->
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <AtasTfm Condition="'$(AtasTfm)' == ''">net10.0</AtasTfm>
+    <TargetFramework>$(AtasTfm)</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
