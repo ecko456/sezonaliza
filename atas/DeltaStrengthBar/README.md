@@ -30,7 +30,7 @@ Výpočet pak běží v tomto pořadí:
 
 ## Build a instalace
 
-Potřebujete .NET SDK 8 nebo novější. Indikátor se sestavuje pro .NET 8 a běží v ATAS na .NET 8 i .NET 10.
+Potřebujete .NET 10 SDK. ATAS X je postavený na .NET 10, indikátor se proto sestavuje pro .NET 10.
 
 ```bash
 cd atas/DeltaStrengthBar
@@ -46,7 +46,7 @@ Pokud ATAS není ve výchozí složce, zadejte cestu k jeho DLL:
 dotnet build -c Release -p:AtasDir="D:\ATAS Platform"
 ```
 
-Výsledný `bin/Release/net8.0/DeltaStrengthBar.dll` zkopírujte do složky indikátorů:
+Výsledný `bin/Release/net10.0/DeltaStrengthBar.dll` zkopírujte do složky indikátorů:
 
 - Windows: `%APPDATA%\ATAS\Indicators\`
 - macOS (ATAS X): `~/Library/Application Support/ATAS/Indicators/`

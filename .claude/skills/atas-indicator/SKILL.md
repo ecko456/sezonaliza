@@ -14,7 +14,7 @@ The user trades **ES futures only** (CME E-mini S&P 500; sometimes MES). Write i
    - *Where it draws*: an overlay on the price panel, or its own panel.
    - *How it draws*: built-in `ValueDataSeries` (lines or histograms, cheap, shows in the data window) or custom `OnRender` (strips, boxes, text, gradients).
    - *Session behaviour on ES*: should the normalisation/accumulation reset at the RTH open or at the Globex open? See `references/es-futures.md`.
-2. **Start from the template**: copy `assets/template/Indicator.cs` and `Indicator.csproj`. The csproj targets net8.0 and references System.Drawing.Common; keep both, they were confirmed against the user's real ATAS install, into `atas/<IndicatorName>/` in the repo and rename. For a worked example with custom rendering, gradients, settings groups and labels, read `assets/examples/DeltaStrengthBar.cs`.
+2. **Start from the template**: copy `assets/template/Indicator.cs` and `Indicator.csproj`. The csproj targets net10.0 and references System.Drawing.Common. Keep both: they were confirmed against the user's real ATAS X install, into `atas/<IndicatorName>/` in the repo and rename. For a worked example with custom rendering, gradients, settings groups and labels, read `assets/examples/DeltaStrengthBar.cs`.
 3. **Implement** following the rules below and `references/api.md`.
 4. **Compile-check**: run `scripts/check_compile.sh atas/<Name>/<Name>.cs`. It builds against API stubs and runs a small smoke test. If `dotnet` is missing, install it first (`apt-get install -y dotnet-sdk-8.0`).
 5. **Deliver**:

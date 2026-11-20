@@ -9,9 +9,9 @@ Balíček obsahuje dva indikátory pro ATAS / ATAS X (laděné na ES):
 
 ## 1. Jednorázová příprava
 
-Nainstalujte **.NET SDK** verze 8 nebo novější (zdarma): https://dotnet.microsoft.com/download
+Nainstalujte **.NET 10 SDK** (zdarma): https://dotnet.microsoft.com/download
 
-Indikátory se sestavují pro .NET 8 a běží v ATAS na .NET 8 i .NET 10.
+ATAS X je postavený na .NET 10, indikátory se proto sestavují pro .NET 10.
 
 Vyberte „SDK“, ne „Runtime“.
 

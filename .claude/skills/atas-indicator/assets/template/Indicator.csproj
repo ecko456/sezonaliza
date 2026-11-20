@@ -4,16 +4,17 @@
     Build:  dotnet build -c Release
     Output: bin/Release/<tfm>/MyEsIndicator.dll  -> copy to the ATAS Indicators folder.
 
-    Targets .NET 8: OFT.Rendering is compiled against System.Drawing.Common 8.0, and a
-    net8.0 assembly also loads in ATAS builds running on .NET 10. Override if needed:
-      dotnet build -c Release -p:AtasTfm=net10.0
+    ATAS X (8.0.16+) is built on .NET 10 (its DLLs reference System.Runtime 10.0), so
+    the indicator must target net10.0. Its bundled System.Drawing.Common is 8.0 – that
+    is a library version, not the runtime. For an old ATAS on .NET 8 override with:
+      dotnet build -c Release -p:AtasTfm=net8.0
 
     The ATAS DLL folder is auto-detected for default installs. Override with:
       dotnet build -c Release -p:AtasDir="D:\ATAS Platform"
   -->
 
   <PropertyGroup>
-    <AtasTfm Condition="'$(AtasTfm)' == ''">net8.0</AtasTfm>
+    <AtasTfm Condition="'$(AtasTfm)' == ''">net10.0</AtasTfm>
     <TargetFramework>$(AtasTfm)</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>

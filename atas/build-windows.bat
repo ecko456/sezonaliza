@@ -29,7 +29,7 @@ if not exist "%ATASDIR%\ATAS.Indicators.dll" (
 echo ATAS: %ATASDIR%
 
 set "TFM=%~2"
-if "%TFM%"=="" set "TFM=net8.0"
+if "%TFM%"=="" set "TFM=net10.0"
 
 set "DEST=%APPDATA%\ATAS\Indicators"
 if not exist "%DEST%" mkdir "%DEST%"
@@ -51,6 +51,6 @@ exit /b 0
 :fail
 echo.
 echo [CHYBA] Build selhal. Zkopirujte prosim chybove hlasky vyse (radky s "error") a poslete je.
-echo Pokud chyba zminuje verzi .NET, zkuste:  build-windows.bat "cesta k ATAS" net10.0
+echo Starsi ATAS (ne ATAS X) na .NET 8:  build-windows.bat "cesta k ATAS" net8.0
 pause
 exit /b 1
