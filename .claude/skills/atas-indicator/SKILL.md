@@ -1,0 +1,64 @@
+---
+name: atas-indicator
+description: Write, fix or extend custom C# indicators for the ATAS / ATAS X order-flow trading platform, tuned for ES (E-mini S&P 500) and MES futures. Use this skill whenever the user wants an ATAS indicator, an order-flow/footprint/delta/volume/CVD study, a colored strip, levels, markers or any custom drawing on an ATAS chart, or mentions ATAS, ATAS X, OnCalculate/OnRender, RenderContext, IndicatorCandle — even if they only describe the visual ("barevný pruh pod cenou", "zvýrazni absorpci na ES") without naming ATAS. Also use it to port an indicator from TradingView/Pine, NinjaTrader or Sierra Chart into ATAS.
+---
+
+# ATAS / ATAS X indicator (ES futures)
+
+The user trades **ES futures only** (CME E-mini S&P 500; sometimes MES). Write indicators with that market in mind: order-flow first (delta, bid/ask volume), intraday timeframes, RTH vs. overnight sessions. The user writes in Czech. Write the code, comments and setting names in English and the README and chat replies in Czech.
+
+## Workflow
+
+1. **Pin down the spec** from the request. Decide these, ask only when it's genuinely ambiguous:
+   - *What is computed*: the formula, the inputs (candle fields), the lookback and smoothing.
+   - *Where it draws*: an overlay on the price panel, or its own panel.
+   - *How it draws*: built-in `ValueDataSeries` (lines or histograms, cheap, shows in the data window) or custom `OnRender` (strips, boxes, text, gradients).
+   - *Session behaviour on ES*: should the normalisation/accumulation reset at the RTH open or at the Globex open? See `references/es-futures.md`.
+2. **Start from the template**: copy `assets/template/Indicator.cs` and `Indicator.csproj` into `atas/<IndicatorName>/` in the repo and rename. For a worked example with custom rendering, gradients, settings groups and labels, read `assets/examples/DeltaStrengthBar.cs`.
+3. **Implement** following the rules below and `references/api.md`.
+4. **Compile-check**: run `scripts/check_compile.sh atas/<Name>/<Name>.cs`. It builds against API stubs and runs a small smoke test. If `dotnet` is missing, install it first (`apt-get install -y dotnet-sdk-8.0`).
+5. **Deliver**:
+   - `<Name>.cs`, `<Name>.csproj` and a short Czech `README.md` (what it shows, the settings, build and install steps).
+   - Add an `atas/.gitignore` with `bin/` and `obj/` if it doesn't exist yet.
+   - In the reply, list honestly which API calls were only stub-checked, so the user knows what to report back if the real build fails.
+
+## Rules that prevent the usual bugs
+
+**`OnCalculate(bar, value)` runs many times for the live bar.** Every tick re-invokes it for the last bar. Any state must therefore be indexed by bar and derived from `bar - 1` values, never accumulated in a plain field like `_sum += delta`. That would double-count on every tick. Reset per-bar storage when `bar == 0`, because ATAS calls a full recalculation starting at bar 0 after settings change or data reload.
+
+**Settings setters decide what happens next.** If a parameter changes the math, call `RecalculateValues()`. If it is visual only (colors, sizes, positions), call `RedrawChart()`. Use backing fields with defaults and don't assign properties in the constructor, so these calls don't fire before the indicator is attached.
+
+**Setting attributes**: use `[Display(Name = "...", GroupName = "1. Calculation", Order = 10, Description = "...")]` and `[Range(min, max)]` from `System.ComponentModel.DataAnnotations`. Numbered group names keep the groups ordered in the dialog. Enums show their `[Display(Name)]` in drop-downs.
+
+**Colors are `System.Drawing.Color`.** That's what ATAS X community indicators use and it works cross-platform. Avoid WPF types (`System.Windows.Media.*`): ATAS X also runs on macOS.
+
+**Numbers**: candle values are `decimal`. Cast to `double` only for `Math.Sqrt`, `Math.Pow` or `Math.Log`, then cast back. Guard against division by zero, because ES does have zero-volume bars in thin overnight periods and on some chart types.
+
+**Rendering (`OnRender`) must be cheap.** It runs on every repaint.
+- Return early unless the layout matches what you subscribed to, and also when `ChartInfo`, `ChartInfo.PriceChartContainer` or `Container` is null.
+- Loop only over `FirstVisibleBarNumber..LastVisibleBarNumber`, clamped to the computed range.
+- Create fonts and pens once (as fields, or before the loop), not per bar. No LINQ and no string formatting unless a label is actually drawn.
+- For contiguous per-bar cells, take the width from `GetXByBar(bar + 1) - GetXByBar(bar)` instead of `BarsWidth`. That stays correct at any zoom.
+- Pixel heights from settings don't scale with the price axis. Use `ChartInfo.GetYByPrice(price, false)` for anything tied to a price level.
+
+**Overlay vs. own panel**:
+- Price-panel overlay: `base(true)`, then `Panel = IndicatorDataProvider.CandlesPanel; DenyToChangePanel = true;`
+- Own panel: `Panel = IndicatorDataProvider.NewPanel;`
+- If you draw everything yourself, hide `DataSeries[0]` (`IsHidden = true` and `VisualType = VisualMode.Hide`). Otherwise a stray zero line appears.
+
+**Lookback loops**: an O(lookback) loop per bar is fine up to a few hundred bars. For larger windows, or several of them, keep rolling sums indexed by bar.
+
+**Use instrument data, not hardcoded ES constants.** Use `InstrumentInfo.TickSize` rather than `0.25`, so the indicator also works on MES and on other tick-size settings.
+
+## ES-specific defaults (details in `references/es-futures.md`)
+
+- Volume and delta differ by an order of magnitude between the RTH (15:30–22:00 CET) and overnight sessions. Any normalisation over a lookback window (max |delta|, z-score, average volume) is distorted around the RTH open. Offer a *session-aware* option: reset or separate the statistics at the session start (`IsNewSession(bar)`).
+- Ratios like `Delta / Volume` are session-independent and make the safest default.
+- Typical "strong" thresholds on 1–5 min ES bars: |delta|/volume ≥ 0.3–0.4. Treat these as starting points to expose as settings, not truths.
+
+## References
+
+- `references/api.md`: ATAS API cheat sheet with a confidence level per item. Read it when unsure about a signature.
+- `references/es-futures.md`: ES contract specs, sessions in CET, roll calendar, order-flow notes.
+- `assets/examples/DeltaStrengthBar.cs`: complete custom-render indicator (3-point gradient strip from delta strength).
+- `scripts/check_compile.sh`: stub compile and smoke test.
