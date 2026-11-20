@@ -66,4 +66,6 @@ The user trades **ES futures only** (CME E-mini S&P 500; sometimes MES). Write i
 ## The user's trading style (keep in mind when proposing ideas)
 
 The user looks for **reversal situations in order flow**: a wick forms, the bar's VPOC sits in the wick, and the delta inside the wick is strongly one-sided. That means absorption (delta against the rejection) or initiative/"pohlcení" (delta with the rejection). When they say "gamma" in this context they most likely mean delta in the wick, not options gamma. Confirm if it matters.
+
+They read the footprint **at the VPOC level**, e.g. `483 x 157` on the VPOC means sellers. Don't judge such setups only on the aggregate delta of a whole wick or bar. Mixed levels around the VPOC dilute it: on their real example the whole-wick delta was 2.7 % while the VPOC level was 51 %. Default to measuring at the VPOC level and offer zone or whole-wick as options.
 - `scripts/check_compile.sh`: stub compile and smoke test.

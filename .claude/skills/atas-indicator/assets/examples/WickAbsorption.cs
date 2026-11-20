@@ -32,6 +32,18 @@ using OFT.Rendering.Tools;
 
 namespace WickAbsorptionIndicator
 {
+    public enum DeltaSource
+    {
+        [Display(Name = "VPOC level")]
+        VpocLevel,
+
+        [Display(Name = "VPOC zone (± ticks)")]
+        VpocZone,
+
+        [Display(Name = "Whole wick")]
+        WholeWick,
+    }
+
     public enum WickSignal
     {
         None = 0,
@@ -51,7 +63,8 @@ namespace WickAbsorptionIndicator
             public decimal WickTop;     // price
             public decimal WickBottom;  // price
             public decimal Vpoc;
-            public decimal WickDelta;
+            public decimal WickDelta;   // whole wick
+            public decimal SignalDelta; // delta the signal was judged on (per DeltaSource)
             public decimal WickVolume;
         }
 
@@ -68,11 +81,15 @@ namespace WickAbsorptionIndicator
         // delta
         private bool _detectAbsorption = true;
         private bool _detectInitiative = true;
-        private int _minWickDelta = 150;
+        private DeltaSource _deltaSource = DeltaSource.VpocLevel;
+        private int _vpocZoneTicks = 1;
+        private int _minWickDelta = 100;
         private decimal _minWickDeltaRatio = 0.15m;
 
         // filters
         private bool _onlyClosedBars = true;
+
+        private readonly List<PriceVolumeInfo> _levels = new();
 
         // visuals
         private Color _bullAbsorptionColor = Color.FromArgb(255, 0, 190, 255);
@@ -128,6 +145,24 @@ namespace WickAbsorptionIndicator
 
         #region Settings – 2. Delta in wick
 
+        [Display(Name = "Measure delta at", GroupName = "2. Delta in wick", Order = 5,
+            Description = "VPOC level = only the VPOC price (how you read the footprint). " +
+                          "VPOC zone = VPOC ± N ticks inside the wick. Whole wick = sum of all wick levels.")]
+        public DeltaSource DeltaSource
+        {
+            get => _deltaSource;
+            set { _deltaSource = value; RecalculateValues(); }
+        }
+
+        [Display(Name = "VPOC zone (± ticks)", GroupName = "2. Delta in wick", Order = 6,
+            Description = "Used with 'VPOC zone'.")]
+        [Range(1, 20)]
+        public int VpocZoneTicks
+        {
+            get => _vpocZoneTicks;
+            set { _vpocZoneTicks = Math.Clamp(value, 1, 20); RecalculateValues(); }
+        }
+
         [Display(Name = "Detect absorption", GroupName = "2. Delta in wick", Order = 10,
             Description = "Wick delta against the rejection (e.g. negative in a lower wick).")]
         public bool DetectAbsorption
@@ -144,8 +179,8 @@ namespace WickAbsorptionIndicator
             set { _detectInitiative = value; RecalculateValues(); }
         }
 
-        [Display(Name = "Min |wick delta| (contracts)", GroupName = "2. Delta in wick", Order = 30,
-            Description = "ES 1-min RTH: ~100–300. Overnight / MES: lower. 0 = off.")]
+        [Display(Name = "Min |delta| (contracts)", GroupName = "2. Delta in wick", Order = 30,
+            Description = "Measured where 'Measure delta at' says. ES RTH VPOC level: ~100+. Overnight / MES: lower. 0 = off.")]
         [Range(0, 100000)]
         public int MinWickDelta
         {
@@ -153,8 +188,8 @@ namespace WickAbsorptionIndicator
             set { _minWickDelta = Math.Max(0, value); RecalculateValues(); }
         }
 
-        [Display(Name = "Min |wick delta| / wick volume", GroupName = "2. Delta in wick", Order = 40,
-            Description = "How one-sided the wick was (0.15 = 15 %). Works in any session. 0 = off.")]
+        [Display(Name = "Min |delta| / volume", GroupName = "2. Delta in wick", Order = 40,
+            Description = "How one-sided the measured levels were (0.15 = 15 %). Works in any session. 0 = off.")]
         [Range(0, 1)]
         public decimal MinWickDeltaRatio
         {
@@ -299,16 +334,19 @@ namespace WickAbsorptionIndicator
             var lowerWick = bodyLow - candle.Low;
             var upperWick = candle.High - bodyHigh;
 
-            // One pass over the footprint: VPOC + volume/delta in each wick.
-            decimal vpoc = 0, vpocVol = -1;
-            decimal lowVol = 0, lowDelta = 0, upVol = 0, upDelta = 0;
-
             var levels = candle.GetAllPriceLevels();
             if (levels == null)
                 return none;
 
+            // Pass 1: copy levels, find VPOC, sum volume/delta of each wick.
+            _levels.Clear();
+            decimal vpoc = 0, vpocVol = -1;
+            decimal lowVol = 0, lowDelta = 0, upVol = 0, upDelta = 0;
+
             foreach (var lvl in levels)
             {
+                _levels.Add(lvl);
+
                 if (lvl.Volume > vpocVol)
                 {
                     vpocVol = lvl.Volume;
@@ -330,8 +368,12 @@ namespace WickAbsorptionIndicator
             if (vpocVol <= 0)
                 return none;
 
-            var bull = Evaluate(true, lowerWick, range, tick, vpoc < bodyLow, lowVol, lowDelta, candle.Volume);
-            var bear = Evaluate(false, upperWick, range, tick, vpoc > bodyHigh, upVol, upDelta, candle.Volume);
+            // Pass 2: delta/volume the signal is judged on, per wick.
+            var (lowSigDelta, lowSigVol) = SignalDelta(true, vpoc, bodyLow, bodyHigh, tick, lowDelta, lowVol);
+            var (upSigDelta, upSigVol) = SignalDelta(false, vpoc, bodyLow, bodyHigh, tick, upDelta, upVol);
+
+            var bull = Evaluate(true, lowerWick, range, tick, vpoc < bodyLow, lowVol, candle.Volume, lowSigDelta, lowSigVol);
+            var bear = Evaluate(false, upperWick, range, tick, vpoc > bodyHigh, upVol, candle.Volume, upSigDelta, upSigVol);
 
             // Doji-like candles can qualify on both sides – keep the wick with more volume.
             if (bull != WickSignal.None && (bear == WickSignal.None || lowVol >= upVol))
@@ -339,7 +381,7 @@ namespace WickAbsorptionIndicator
                 return new BarInfo
                 {
                     Signal = bull, WickTop = bodyLow - tick, WickBottom = candle.Low,
-                    Vpoc = vpoc, WickDelta = lowDelta, WickVolume = lowVol,
+                    Vpoc = vpoc, WickDelta = lowDelta, WickVolume = lowVol, SignalDelta = lowSigDelta,
                 };
             }
 
@@ -348,15 +390,38 @@ namespace WickAbsorptionIndicator
                 return new BarInfo
                 {
                     Signal = bear, WickTop = candle.High, WickBottom = bodyHigh + tick,
-                    Vpoc = vpoc, WickDelta = upDelta, WickVolume = upVol,
+                    Vpoc = vpoc, WickDelta = upDelta, WickVolume = upVol, SignalDelta = upSigDelta,
                 };
             }
 
             return none;
         }
 
+        /// <summary>Delta and volume used for the signal, according to DeltaSource.</summary>
+        private (decimal delta, decimal volume) SignalDelta(bool lowerWick, decimal vpoc,
+            decimal bodyLow, decimal bodyHigh, decimal tick, decimal wickDelta, decimal wickVol)
+        {
+            if (_deltaSource == DeltaSource.WholeWick)
+                return (wickDelta, wickVol);
+
+            var half = _deltaSource == DeltaSource.VpocZone ? _vpocZoneTicks * tick : 0m;
+            decimal d = 0, v = 0;
+
+            foreach (var lvl in _levels)
+            {
+                var inWick = lowerWick ? lvl.Price < bodyLow : lvl.Price > bodyHigh;
+                if (!inWick || Math.Abs(lvl.Price - vpoc) > half)
+                    continue;
+
+                d += lvl.Ask - lvl.Bid;
+                v += lvl.Volume;
+            }
+
+            return (d, v);
+        }
+
         private WickSignal Evaluate(bool lowerWick, decimal wick, decimal range, decimal tick,
-            bool vpocInWick, decimal wickVol, decimal wickDelta, decimal candleVol)
+            bool vpocInWick, decimal wickVol, decimal candleVol, decimal sigDelta, decimal sigVol)
         {
             if (wick < _minWickTicks * tick || wick / range < _minWickRatio)
                 return WickSignal.None;
@@ -367,13 +432,13 @@ namespace WickAbsorptionIndicator
             if (wickVol <= 0 || wickVol / candleVol < _minWickVolumeShare)
                 return WickSignal.None;
 
-            var absDelta = Math.Abs(wickDelta);
-            if (absDelta == 0 || absDelta < _minWickDelta || absDelta / wickVol < _minWickDeltaRatio)
+            var absDelta = Math.Abs(sigDelta);
+            if (absDelta == 0 || sigVol <= 0 || absDelta < _minWickDelta || absDelta / sigVol < _minWickDeltaRatio)
                 return WickSignal.None;
 
             // Lower wick: negative delta = sellers absorbed; positive = buyers' initiative.
             // Upper wick: the mirror image.
-            var againstRejection = lowerWick ? wickDelta < 0 : wickDelta > 0;
+            var againstRejection = lowerWick ? sigDelta < 0 : sigDelta > 0;
 
             if (againstRejection && _detectAbsorption)
                 return lowerWick ? WickSignal.BullAbsorption : WickSignal.BearAbsorption;
@@ -446,7 +511,7 @@ namespace WickAbsorptionIndicator
 
                 if (_showLabels)
                 {
-                    var text = FormatDelta(info.WickDelta);
+                    var text = FormatDelta(info.SignalDelta);
                     var size = context.MeasureString(text, _font);
                     var tx = x + (width - size.Width) / 2;
                     var isBull = info.Signal == WickSignal.BullAbsorption || info.Signal == WickSignal.BullInitiative;
