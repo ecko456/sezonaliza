@@ -45,10 +45,34 @@ namespace ATAS.Indicators
 
     public enum VisualMode { Line, Histogram, Dots, Block, Hide, UpArrow, DownArrow, Square }
 
+    public class PriceVolumeInfo
+    {
+        public decimal Price { get; set; }
+        public decimal Volume { get; set; }
+        public decimal Bid { get; set; }
+        public decimal Ask { get; set; }
+    }
+
     public class IndicatorCandle
     {
         public decimal Open, High, Low, Close, Volume, Delta, Ask, Bid, MaxDelta, MinDelta, Ticks;
         public DateTime Time, LastTime;
+
+        // footprint
+        public List<PriceVolumeInfo> StubLevels = new();
+        public IEnumerable<PriceVolumeInfo> GetAllPriceLevels() => StubLevels;
+        public PriceVolumeInfo GetPriceVolumeInfo(decimal price) => StubLevels.Find(l => l.Price == price);
+
+        public PriceVolumeInfo MaxVolumePriceInfo
+        {
+            get
+            {
+                PriceVolumeInfo best = null;
+                foreach (var l in StubLevels)
+                    if (best == null || l.Volume > best.Volume) best = l;
+                return best;
+            }
+        }
     }
 
     public abstract class IDataSeries

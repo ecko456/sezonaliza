@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Build:  dotnet build -c Release
+    Output: bin/Release/<tfm>/WickAbsorption.dll  -> copy to the ATAS Indicators folder.
+
+    ATAS X currently ships on .NET 10. If your ATAS build is older, change
+    TargetFramework to match it (e.g. net8.0).
+
+    The ATAS DLL folder is auto-detected for default installs. Override with:
+      dotnet build -c Release -p:AtasDir="D:\ATAS Platform"
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>WickAbsorption</AssemblyName>
+    <RootNamespace>WickAbsorptionIndicator</RootNamespace>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(AtasDir)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">
+    <AtasDir>C:\Program Files (x86)\ATAS Platform</AtasDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(AtasDir)' == '' And $([MSBuild]::IsOSPlatform('OSX'))">
+    <AtasDir>/Applications/ATAS X.app/Contents/MonoBundle</AtasDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="ATAS.Indicators">
+      <HintPath>$(AtasDir)/ATAS.Indicators.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ATAS.DataFeedsCore">
+      <HintPath>$(AtasDir)/ATAS.DataFeedsCore.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="OFT.Rendering">
+      <HintPath>$(AtasDir)/OFT.Rendering.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="OFT.Attributes">
+      <HintPath>$(AtasDir)/OFT.Attributes.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Utils.Common">
+      <HintPath>$(AtasDir)/Utils.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

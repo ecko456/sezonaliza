@@ -60,18 +60,31 @@ static class Harness
         for (int i = 0; i < n; i++)
         {
             bool rth = (i % 390) >= 60 && (i % 390) < 300;     // crude RTH vs ETH volume regime
-            int vol = i % 50 == 7 ? 0 : rnd.Next(rth ? 800 : 40, rth ? 6000 : 400);
-            int ask = vol == 0 ? 0 : rnd.Next(0, vol + 1);
+            bool empty = i % 50 == 7;                            // zero-volume bar
             decimal open = price;
             price += rnd.Next(-8, 9) * 0.25m;
-            list.Add(new IndicatorCandle
+            var c = new IndicatorCandle
             {
                 Open = open, Close = price,
-                High = Math.Max(open, price) + rnd.Next(0, 5) * 0.25m,
-                Low = Math.Min(open, price) - rnd.Next(0, 5) * 0.25m,
-                Volume = vol, Ask = ask, Bid = vol - ask, Delta = 2 * ask - vol,
-                Ticks = vol / 3, Time = new DateTime(2026, 11, 2, 0, 0, 0).AddMinutes(i),
-            });
+                High = Math.Max(open, price) + rnd.Next(0, 9) * 0.25m,
+                Low = Math.Min(open, price) - rnd.Next(0, 9) * 0.25m,
+                Time = new DateTime(2026, 11, 2, 0, 0, 0).AddMinutes(i),
+            };
+
+            // Footprint: volume per 0.25 level; candle totals are derived from it.
+            if (!empty)
+            {
+                for (var p = c.Low; p <= c.High; p += 0.25m)
+                {
+                    int v = rnd.Next(rth ? 50 : 2, rth ? 900 : 60);
+                    int a = rnd.Next(0, v + 1);
+                    c.StubLevels.Add(new PriceVolumeInfo { Price = p, Volume = v, Ask = a, Bid = v - a });
+                    c.Volume += v; c.Ask += a; c.Bid += v - a;
+                }
+            }
+            c.Delta = c.Ask - c.Bid;
+            c.Ticks = c.Volume / 3;
+            list.Add(c);
         }
         return list;
     }

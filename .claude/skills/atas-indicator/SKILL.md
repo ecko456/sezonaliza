@@ -61,4 +61,9 @@ The user trades **ES futures only** (CME E-mini S&P 500; sometimes MES). Write i
 - `references/api.md`: ATAS API cheat sheet with a confidence level per item. Read it when unsure about a signature.
 - `references/es-futures.md`: ES contract specs, sessions in CET, roll calendar, order-flow notes.
 - `assets/examples/DeltaStrengthBar.cs`: complete custom-render indicator (3-point gradient strip from delta strength).
+- `assets/examples/WickAbsorption.cs`: footprint-based reversal detector (wick, VPOC in wick, wick delta: absorption vs. initiative). Use it as the pattern for anything that works per price level.
+
+## The user's trading style (keep in mind when proposing ideas)
+
+The user looks for **reversal situations in order flow**: a wick forms, the bar's VPOC sits in the wick, and the delta inside the wick is strongly one-sided. That means absorption (delta against the rejection) or initiative/"pohlcení" (delta with the rejection). When they say "gamma" in this context they most likely mean delta in the wick, not options gamma. Confirm if it matters.
 - `scripts/check_compile.sh`: stub compile and smoke test.

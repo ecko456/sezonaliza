@@ -81,7 +81,17 @@ _line[bar] = 1.23m;        // write value
 
 ✅/🟡: `Open`, `High`, `Low`, `Close`, `Volume`, `Delta`, `Ask` (buy volume at ask), `Bid` (sell volume at bid), `MaxDelta`, `MinDelta`, `Ticks`, `Time`, `LastTime`. All prices and volumes are `decimal`.
 
-❓ Footprint per price level: `candle.GetAllPriceLevels()` / `candle.GetPriceVolumeInfo(price)` return `PriceVolumeInfo` with `Price`, `Volume`, `Bid`, `Ask`. Verify before relying on it.
+Footprint (volume per price level) 🟡 – used by `assets/examples/WickAbsorption.cs`:
+```csharp
+foreach (PriceVolumeInfo lvl in candle.GetAllPriceLevels())   // every traded price of the bar
+{
+    lvl.Price; lvl.Volume; lvl.Ask; lvl.Bid;                   // level delta = Ask - Bid
+}
+candle.GetPriceVolumeInfo(price);   // one level (null if not traded)
+candle.MaxVolumePriceInfo;          // the VPOC level of the bar
+```
+Prefer computing VPOC yourself during the `GetAllPriceLevels()` pass: one API dependency and one loop.
+Wick/body split: wick levels are `Price < min(Open, Close)` (lower) and `Price > max(Open, Close)` (upper).
 
 ## Chart geometry
 
