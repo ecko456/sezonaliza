@@ -81,10 +81,14 @@ def guess_time_zone(bars):
     """Return the clock time (HH:MM) of the biggest average volume jump, i.e. the ES RTH open."""
     t = bars["time"]
     minute = t.dt.hour * 60 + t.dt.minute
-    prof = bars.groupby(minute)["volume"].mean().reindex(range(1440)).fillna(0)
-    # mean of the next 15 minutes vs the previous 15 – robust to single noisy minutes
-    after = prof[::-1].rolling(15, min_periods=1).mean()[::-1]
-    before = prof.shift(1).rolling(15, min_periods=1).mean()
+    prof = bars.groupby(minute)["volume"].mean().sort_index()
+    # Bar length in minutes (1 for 1M, 5 for 5M ...); compare the next 60 minutes of
+    # bars with the previous 60. A short spike such as the 15:59 ET closing (MOC)
+    # auction loses to the sustained step-up at the RTH open.
+    step = max(1, int(round(t.diff().dt.total_seconds().div(60).median())))
+    win = max(1, 60 // step)
+    after = prof[::-1].rolling(win, min_periods=1).mean()[::-1]
+    before = prof.shift(1).rolling(win, min_periods=1).mean()
     jump = (after - before).idxmax()
     hhmm = f"{int(jump) // 60:02d}:{int(jump) % 60:02d}"
     hints = {

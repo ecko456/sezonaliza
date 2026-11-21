@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Replays the real indicator code on Footprint Exporter data (via the skill's API stubs).
+       Usage: dotnet run -c Release (double-dash) data/ES1M data/ES1M_signals.csv  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <NoWarn>CA1416</NoWarn>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Replay.cs" />
+    <Compile Include="../../.claude/skills/atas-indicator/scripts/stubs/AtasStubs.cs" />
+    <Compile Include="../DeltaStrengthBar/DeltaStrengthBar.cs" />
+    <Compile Include="../WickAbsorption/WickAbsorption.cs" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
+  </ItemGroup>
+</Project>

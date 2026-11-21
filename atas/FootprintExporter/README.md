@@ -19,7 +19,7 @@ Odhad velikosti: 14 dní 1min ES je zhruba 20 tisíc svíček, celkem řádově 
 | Nastavení | Výchozí | Popis |
 |---|---|---|
 | Output folder | `Dokumenty\ATAS_Export` | kam se soubory uloží |
-| Days to export | 14 | počítáno zpět od poslední svíčky, 0 = vše načtené |
+| Trading sessions to export | 14 | **obchodních** session (ne kalendářních dní) zpět od poslední svíčky. Konec session se pozná podle pauzy delší než 30 minut, tedy denní pauzy CME nebo víkendu. 0 = vše načtené. |
 | Keep appending new bars | ano | každá nově uzavřená svíčka se připíše do stejných souborů, takže graf může běžet a sbírat data dál |
 | Export now (tick to run) | – | zaškrtnutím proběhne okamžitý nový export, i o víkendu se zavřeným trhem |
 | Show status on chart | ano | stavový řádek vlevo nahoře |

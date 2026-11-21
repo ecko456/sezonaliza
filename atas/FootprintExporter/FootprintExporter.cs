@@ -65,8 +65,9 @@ namespace FootprintExport
             set { _folder = string.IsNullOrWhiteSpace(value) ? DefaultFolder() : value.Trim(); Restart(); }
         }
 
-        [Display(Name = "Days to export (0 = all loaded)", GroupName = "1. Export", Order = 20,
-            Description = "Counted back from the last bar. The chart must have at least this many days loaded.")]
+        [Display(Name = "Trading sessions to export (0 = all loaded)", GroupName = "1. Export", Order = 20,
+            Description = "Counted back from the last bar. A new session starts after a pause of more than 30 minutes " +
+                          "(the daily CME break or a weekend). The chart must have at least this many days loaded.")]
         [Range(0, 3650)]
         public int Days
         {
@@ -163,13 +164,20 @@ namespace FootprintExport
                     "bar;time;last_time;open;high;low;close;volume;delta;max_delta;min_delta;levels\n", Utf8);
                 File.WriteAllText(_levelsPath, "bar;price;bid;ask;volume\n", Utf8);
 
-                // First bar inside the requested day range.
+                // First bar of the requested number of trading sessions (not calendar days:
+                // 14 calendar days are only ~10 ES sessions). A session boundary is a gap > 30 min.
                 var first = 0;
                 if (_days > 0)
                 {
-                    var cutoff = GetCandle(lastClosedBar).Time.AddDays(-_days);
-                    while (first < lastClosedBar && GetCandle(first).Time < cutoff)
-                        first++;
+                    var sessions = 1;
+                    for (var i = lastClosedBar; i >= 1; i--)
+                    {
+                        if (GetCandle(i).Time - GetCandle(i - 1).Time > TimeSpan.FromMinutes(30) && ++sessions > _days)
+                        {
+                            first = i;
+                            break;
+                        }
+                    }
                 }
 
                 _exportedBars = 0;
@@ -258,7 +266,7 @@ namespace FootprintExport
                 sb.AppendLine("local_time_zone=" + TimeZoneInfo.Local.Id);
                 sb.AppendLine("local_utc_offset=" + TimeZoneInfo.Local.GetUtcOffset(DateTime.Now));
                 sb.AppendLine("candle_time_kind=" + last.Kind);
-                sb.AppendLine("days_requested=" + _days);
+                sb.AppendLine("sessions_requested=" + _days);
                 sb.AppendLine("bars_exported=" + _exportedBars);
                 sb.AppendLine("first_bar_time=" + _firstTime.ToString(TimeFormat, Inv));
                 sb.AppendLine("last_closed_bar_time=" + _lastTime.ToString(TimeFormat, Inv));

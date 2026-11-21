@@ -78,6 +78,12 @@ When they upload them (usually zipped):
 2. Import `load()` for analysis. It gives `bars` with VPOC columns, `levels` with per-level delta, and `meta`.
 3. Replay the indicator logic in Python, or feed the bars into the C# stub harness (`StubRun`) to evaluate signals. Measure forward returns at 5/15/30 min against a same-period baseline, split RTH and overnight, and report the sample size honestly.
 
+Lessons from the first real export (11 sessions, Nov 2026, see `atas/analysis/README.md`):
+- ATAS candle `Time` is **UTC** (RTH open 14:30, MOC spike 20:59, break 22:00–23:00).
+- A fixed delta/volume threshold is meaningless across sessions: the RTH 99th percentile is about 0.20, while in ETH 0.20 is the 75th percentile. Use thresholds relative to RTH/ETH separately.
+- The VPOC + delta wick filter removed the worst counter-trend hammers. No signal family had a proven edge on 11 sessions, so ask for more data before claiming one.
+- Reusable pipeline: `atas/analysis/Replay.cs` runs the real indicator code on exported data, and `evaluate.py` measures forward returns against a same-session random-entry baseline.
+
 A chart OHLC export (`Chart.csv`, `yyyy-dd-MM HH:mm:ss;O;H;L;C`, Prague time) has **no volume**. Only price structure can be studied from it.
 
 ## References
