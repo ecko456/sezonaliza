@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Build:  dotnet build -c Release
+    Output: bin/Release/<tfm>/FootprintExporter.dll  -> copy to the ATAS Indicators folder.
+
+    ATAS X (8.0.16+) is built on .NET 10 (its DLLs reference System.Runtime 10.0), so
+    the indicator must target net10.0. Its bundled System.Drawing.Common is 8.0 – that
+    is a library version, not the runtime. For an old ATAS on .NET 8 override with:
+      dotnet build -c Release -p:AtasTfm=net8.0
+
+    The ATAS DLL folder is auto-detected for default installs. Override with:
+      dotnet build -c Release -p:AtasDir="D:\ATAS Platform"
+  -->
+
+  <PropertyGroup>
+    <AtasTfm Condition="'$(AtasTfm)' == ''">net10.0</AtasTfm>
+    <TargetFramework>$(AtasTfm)</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>FootprintExporter</AssemblyName>
+    <RootNamespace>FootprintExport</RootNamespace>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(AtasDir)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">
+    <AtasDir>C:\Program Files (x86)\ATAS Platform</AtasDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(AtasDir)' == '' And $([MSBuild]::IsOSPlatform('OSX'))">
+    <AtasDir>/Applications/ATAS X.app/Contents/MonoBundle</AtasDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="ATAS.Indicators">
+      <HintPath>$(AtasDir)/ATAS.Indicators.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ATAS.DataFeedsCore">
+      <HintPath>$(AtasDir)/ATAS.DataFeedsCore.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="OFT.Rendering">
+      <HintPath>$(AtasDir)/OFT.Rendering.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="OFT.Attributes">
+      <HintPath>$(AtasDir)/OFT.Attributes.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Utils.Common">
+      <HintPath>$(AtasDir)/Utils.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- System.Drawing.Common: RenderPen/RenderFont expose its types (DashStyle, FontStyle).
+       Use ATAS's own copy when present, otherwise the matching NuGet package (compile only). -->
+  <ItemGroup Condition="Exists('$(AtasDir)/System.Drawing.Common.dll')">
+    <Reference Include="System.Drawing.Common">
+      <HintPath>$(AtasDir)/System.Drawing.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('$(AtasDir)/System.Drawing.Common.dll')">
+    <PackageReference Include="System.Drawing.Common" Version="8.0.10" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

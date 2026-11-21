@@ -66,6 +66,20 @@ The user trades **ES futures only** (CME E-mini S&P 500; sometimes MES). Write i
 - Ratios like `Delta / Volume` are session-independent and make the safest default.
 - Typical "strong" thresholds on 1–5 min ES bars: |delta|/volume ≥ 0.3–0.4. Treat these as starting points to expose as settings, not truths.
 
+## Working with the user's real data
+
+The user can export footprint history from ATAS with **Footprint Exporter** (`atas/FootprintExporter`, also `assets/examples/FootprintExporter.cs`). It produces three files:
+- `…_bars.csv` with `bar;time;last_time;open;high;low;close;volume;delta;max_delta;min_delta;levels`
+- `…_levels.csv` with `bar;price;bid;ask;volume`, one row per traded price
+- `…_meta.txt`
+
+When they upload them (usually zipped):
+1. Run `python3 -I scripts/load_footprint.py <zip or file>`. It prints counts, checks that the level sums match the bar totals, and **detects the time zone** from the RTH-open volume jump (14:30 = UTC winter, 15:30 = CET).
+2. Import `load()` for analysis. It gives `bars` with VPOC columns, `levels` with per-level delta, and `meta`.
+3. Replay the indicator logic in Python, or feed the bars into the C# stub harness (`StubRun`) to evaluate signals. Measure forward returns at 5/15/30 min against a same-period baseline, split RTH and overnight, and report the sample size honestly.
+
+A chart OHLC export (`Chart.csv`, `yyyy-dd-MM HH:mm:ss;O;H;L;C`, Prague time) has **no volume**. Only price structure can be studied from it.
+
 ## References
 
 - `references/api.md`: ATAS API cheat sheet with a confidence level per item. Read it when unsure about a signature.

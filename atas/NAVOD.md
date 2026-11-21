@@ -6,6 +6,7 @@ Balíček obsahuje dva indikátory pro ATAS / ATAS X (laděné na ES):
 |---|---|
 | **Delta Strength Bar** | barevný pruh pod cenou podle síly delty (Bid ↔ Neutral ↔ Ask) |
 | **Wick Absorption** | obratové svíčky: VPOC v knotu a silná delta v knotu (absorpce / iniciativa) |
+| **Footprint Exporter** | uloží historii grafu do CSV (svíčky + bid/ask/objem na každé ceně) pro analýzu |
 
 ## 1. Jednorázová příprava
 
@@ -34,6 +35,14 @@ Na macOS (ATAS X) spusťte v Terminálu ve složce balíčku `./build-mac.sh`.
   - Sedí s tím, co vidíte ve footprintu?
 - Pokud je signálů moc nebo málo, upravte v nastavení *Min |wick delta|* (výchozí 150), *Min wick / range* (0.35) a *Min |wick delta| / wick volume* (0.15).
 - **Delta Strength Bar**: pruh u spodního okraje grafu. Vyzkoušejte všechny 3 módy a polohu „Below each candle low“.
+
+## Export footprint dat (Footprint Exporter)
+
+1. Otevřete **ES 1min** graf a v nastavení grafu nastavte načtení aspoň **14 dní** historie. Počkejte, než se data načtou.
+2. Přidejte indikátor **Footprint Exporter**. Export proběhne sám. Vlevo nahoře na grafu se ukáže počet svíček, rozsah dat a cesta k souborům.
+3. Ve složce `Dokumenty\ATAS_Export` budou 3 soubory: `…_bars.csv`, `…_levels.csv` a `…_meta.txt`. Zabalte je do zipu a nahrajte je sem do chatu.
+
+Podrobnosti najdete ve `FootprintExporter/README.md`.
 
 ## Když něco nejde
 

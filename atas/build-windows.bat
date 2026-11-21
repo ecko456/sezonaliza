@@ -34,7 +34,7 @@ if "%TFM%"=="" set "TFM=net10.0"
 set "DEST=%APPDATA%\ATAS\Indicators"
 if not exist "%DEST%" mkdir "%DEST%"
 
-for %%P in (DeltaStrengthBar WickAbsorption) do (
+for %%P in (DeltaStrengthBar WickAbsorption FootprintExporter) do (
   echo.
   echo === %%P ===
   dotnet build "%%P\%%P.csproj" -c Release -p:AtasDir="%ATASDIR%" -p:AtasTfm=%TFM% -o "out\%%P"
@@ -44,7 +44,7 @@ for %%P in (DeltaStrengthBar WickAbsorption) do (
 )
 
 echo.
-echo HOTOVO. Restartujte ATAS a pridejte indikatory "Delta Strength Bar" a "Wick Absorption".
+echo HOTOVO. Restartujte ATAS a pridejte indikatory "Delta Strength Bar", "Wick Absorption" a "Footprint Exporter".
 pause
 exit /b 0
 

@@ -136,6 +136,7 @@ namespace ATAS.Indicators
     public class InstrumentInfo
     {
         public decimal TickSize { get; set; } = 0.25m;
+        public string Instrument { get; set; } = "ESZ6";
     }
 
     public static class IndicatorDataProvider
@@ -179,11 +180,11 @@ namespace ATAS.Indicators
         {
             StubCandles = candles;
             StubSessionLength = sessionLength;
+
+            // As in ATAS: during the history pass CurrentBar is already the total bar count.
+            CurrentBar = candles.Count;
             for (var i = 0; i < candles.Count; i++)
-            {
-                CurrentBar = i + 1;
                 OnCalculate(i, candles[i].Close);
-            }
 
             // Simulate repeated calls on the live bar – results must not change
             // (state accumulated in plain fields would double-count here).
@@ -211,6 +212,15 @@ namespace ATAS.Indicators
         }
 
         /// <summary>Render into a caller-supplied context with the current ChartInfo/Container/visible range.</summary>
+        /// <summary>Simulate a new live bar arriving (stub only).</summary>
+        public void StubAddBar(IndicatorCandle candle, int ticks = 3)
+        {
+            StubCandles.Add(candle);
+            CurrentBar = StubCandles.Count;
+            for (var t = 0; t < ticks; t++)
+                OnCalculate(StubCandles.Count - 1, candle.Close);
+        }
+
         public void StubRenderTo(OFT.Rendering.Context.RenderContext ctx) => OnRender(ctx, DrawingLayouts.Final);
 
         public int StubRender()
