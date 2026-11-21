@@ -52,6 +52,17 @@ Export z Footprint Exporteru:
 2. **Přepočítat A a E na adaptivní prahy:** percentil delta/objem a objemu zvlášť pro RTH a ETH, delší okno pro E.
 3. **Rozjetí** buď zmírnit, nebo nahradit vstupem na close knotové svíčky.
 
+## Data pro optimalizaci 5M grafu
+
+- **Stačí 1M export.** 5M svíčky z něj skládá `resample_footprint.py`. Ověřeno na listopadovém exportu:
+  - 2758 z 2759 5M svíček je shodných s 5M exportem z ATASu (OHLC, objem, delta, max/min delta),
+  - 0,03 % cenových úrovní se liší,
+  - **100 % signálů** obou indikátorů je shodných.
+- **RTH vs. celá session:** exportujte ze stejně nastaveného grafu, na jakém obchodujete. Vyhodnocují se vždy jen signály v RTH.
+  - Wick Absorption na nočních svíčkách nezávisí (0 rozdílů).
+  - Delta Strength Bar se bez noci liší jen v prvních 30 min RTH. Na 5M je to 36 z 270 signálů, téměř vše E (vyčerpání), protože nové high/low po otevření se pak porovnává se včerejším závěrem místo s nocí.
+- **Velikost:** 11 session 1M s nocí má zazipovaně 1,6 MB, samotné RTH 0,7 MB. 60 session vyjde zhruba na 9 MB, samotné RTH na 4 MB.
+
 ## Jak analýzu zopakovat
 
 ```bash
@@ -66,6 +77,12 @@ dotnet run -c Release -- data/ES1M data/ES1M_signals.csv
 
 ```bash
 dotnet run -c Release -- data/ES5M data/ES5M_signals.csv
+```
+
+5M z 1M exportu (volitelně `--rth`):
+
+```bash
+python3 -I ../../.claude/skills/atas-indicator/scripts/resample_footprint.py data/ES1M_bars.csv 5 data/ES5M
 ```
 
 A vyhodnocení:

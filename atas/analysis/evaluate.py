@@ -9,7 +9,7 @@ BEAR = {'BearAbsorption','BearInitiative','BearIgnition','BuyersAbsorbed','UpExh
 
 def prep(prefix, step_min):
     b,_,_ = load(prefix + '_bars.csv')
-    s = pd.read_csv(prefix + '_signals.csv', sep=';').set_index('bar')
+    s = pd.read_csv(prefix + '_signals.csv', sep=';', keep_default_na=False).set_index('bar')
     b = b.join(s)
     b['sess'] = (b.time + pd.Timedelta(hours=1)).dt.date          # Globex day (starts 23:00 UTC)
     m = b.time.dt.hour*60 + b.time.dt.minute

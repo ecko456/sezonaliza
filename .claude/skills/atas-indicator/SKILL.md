@@ -82,6 +82,9 @@ Lessons from the first real export (11 sessions, Nov 2026, see `atas/analysis/RE
 - ATAS candle `Time` is **UTC** (RTH open 14:30, MOC spike 20:59, break 22:00–23:00).
 - A fixed delta/volume threshold is meaningless across sessions: the RTH 99th percentile is about 0.20, while in ETH 0.20 is the 75th percentile. Use thresholds relative to RTH/ETH separately.
 - The VPOC + delta wick filter removed the worst counter-trend hammers. No signal family had a proven edge on 11 sessions, so ask for more data before claiming one.
+- **1M export is enough for any higher timeframe.** `scripts/resample_footprint.py` rebuilds N-minute footprint bars. 5M rebuilt from 1M matched ATAS's native 5M export on 100 % of indicator signals.
+- RTH-only vs full-session data: export from the chart the user actually trades. Indicators with lookbacks (median volume, N-bar high/low) differ in the first ~30 min of RTH without the overnight bars. Wick Absorption has no lookback and is unaffected.
+- `pd.read_csv` turns the string "None" into NaN. Read signal files with `keep_default_na=False`.
 - Reusable pipeline: `atas/analysis/Replay.cs` runs the real indicator code on exported data, and `evaluate.py` measures forward returns against a same-session random-entry baseline.
 
 A chart OHLC export (`Chart.csv`, `yyyy-dd-MM HH:mm:ss;O;H;L;C`, Prague time) has **no volume**. Only price structure can be studied from it.
