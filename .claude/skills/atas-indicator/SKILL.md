@@ -46,6 +46,16 @@ The user trades **ES futures only** (CME E-mini S&P 500; sometimes MES). Write i
 - Own panel: `Panel = IndicatorDataProvider.NewPanel;`
 - If you draw everything yourself, hide `DataSeries[0]` (`IsHidden = true` and `VisualType = VisualMode.Hide`). Otherwise a stray zero line appears.
 
+**Relative volume: use the median, not the mean.** One huge bar (RTH open, news, a capitulation wick) inflates a mean for the whole window. The following normal bars then look "thin" and trigger false low-volume signals. This happened in the Delta Strength Bar preview.
+
+**Readability**: the user finds dark or muddy colors hard to read.
+- Prefer saturated colors on a dark-gray neutral.
+- Use discrete intensity steps rather than long gradients.
+- Use a glyph per signal type (▲▼ A E •), with color for direction and glyph for type.
+- Text contrast is picked automatically from the cell luminance.
+- Draw triangles line by line with `DrawLine`; that works on every renderer.
+- Preview renders: the stub `RenderContext` records draw ops (`Ops`), and `ChartInfo.XByBar`/`YByPrice` are settable. Render the ops to a PNG with PIL to check the look before shipping (see `atas/DeltaStrengthBar/preview.png`).
+
 **Lookback loops**: an O(lookback) loop per bar is fine up to a few hundred bars. For larger windows, or several of them, keep rolling sums indexed by bar.
 
 **Use instrument data, not hardcoded ES constants.** Use `InstrumentInfo.TickSize` rather than `0.25`, so the indicator also works on MES and on other tick-size settings.
@@ -61,6 +71,7 @@ The user trades **ES futures only** (CME E-mini S&P 500; sometimes MES). Write i
 - `references/api.md`: ATAS API cheat sheet with a confidence level per item. Read it when unsure about a signature.
 - `references/es-futures.md`: ES contract specs, sessions in CET, roll calendar, order-flow notes.
 - `assets/examples/DeltaStrengthBar.cs`: complete custom-render indicator (3-point gradient strip from delta strength).
+- `assets/examples/DeltaStrengthBar.cs` also contains a two-lane signal strip: ignition after a wick setup, absorption, exhaustion, median relative volume.
 - `assets/examples/WickAbsorption.cs`: footprint-based reversal detector (wick, VPOC in wick, wick delta: absorption vs. initiative). Use it as the pattern for anything that works per price level.
 
 ## The user's trading style (keep in mind when proposing ideas)

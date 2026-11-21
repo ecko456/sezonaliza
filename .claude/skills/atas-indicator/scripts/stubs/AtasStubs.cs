@@ -12,29 +12,46 @@ namespace OFT.Rendering.Tools
 {
     public class RenderFont
     {
-        public RenderFont(string family, float size) { }
-        public RenderFont(string family, float size, FontStyle style) { }
+        public float Size;
+        public RenderFont(string family, float size) { Size = size; }
+        public RenderFont(string family, float size, FontStyle style) { Size = size; }
     }
 
     public class RenderPen
     {
-        public RenderPen(Color color, float width = 1f) { }
+        public Color Color;
+        public float Width;
+        public RenderPen(Color color, float width = 1f) { Color = color; Width = width; }
         public System.Drawing.Drawing2D.DashStyle DashStyle { get; set; }
     }
 }
 
 namespace OFT.Rendering.Context
 {
+    using System.Collections.Generic;
     using OFT.Rendering.Tools;
 
     public class RenderContext
     {
         public int Calls;
-        public void FillRectangle(Color color, Rectangle rect) => Calls++;
-        public void DrawRectangle(RenderPen pen, Rectangle rect) => Calls++;
-        public void DrawLine(RenderPen pen, int x1, int y1, int x2, int y2) => Calls++;
-        public void DrawString(string text, RenderFont font, Color color, int x, int y) => Calls++;
-        public Size MeasureString(string text, RenderFont font) => new(text.Length * 5, 9);
+
+        // Recorded draw operations (stub only) – used to render previews.
+        public readonly List<object[]> Ops = new();
+
+        public void FillRectangle(Color color, Rectangle rect)
+        { Calls++; Ops.Add(new object[] { "fill", color.ToArgb(), rect.X, rect.Y, rect.Width, rect.Height }); }
+
+        public void DrawRectangle(RenderPen pen, Rectangle rect)
+        { Calls++; Ops.Add(new object[] { "rect", pen.Color.ToArgb(), rect.X, rect.Y, rect.Width, rect.Height, pen.Width }); }
+
+        public void DrawLine(RenderPen pen, int x1, int y1, int x2, int y2)
+        { Calls++; Ops.Add(new object[] { "line", pen.Color.ToArgb(), x1, y1, x2, y2, pen.Width }); }
+
+        public void DrawString(string text, RenderFont font, Color color, int x, int y)
+        { Calls++; Ops.Add(new object[] { "text", color.ToArgb(), x, y, text, font.Size }); }
+
+        public Size MeasureString(string text, RenderFont font) =>
+            new((int)Math.Ceiling(text.Length * font.Size * 0.62), (int)Math.Ceiling(font.Size * 1.25));
     }
 }
 
@@ -110,8 +127,10 @@ namespace ATAS.Indicators
     public class ChartInfo
     {
         public PriceChartContainer PriceChartContainer { get; set; } = new();
-        public int GetXByBar(int bar, bool isStartOfBar = true) => bar * 10;
-        public int GetYByPrice(decimal price, bool isStartOfTick = true) => 400 - (int)(price % 400);
+        public Func<int, int> XByBar = bar => bar * 10;
+        public Func<decimal, int> YByPrice = price => 400 - (int)(price % 400);
+        public int GetXByBar(int bar, bool isStartOfBar = true) => XByBar(bar);
+        public int GetYByPrice(decimal price, bool isStartOfTick = true) => YByPrice(price);
     }
 
     public class InstrumentInfo
@@ -190,6 +209,9 @@ namespace ATAS.Indicators
                 list.Add(s is ValueDataSeries v ? v[bar] : 0m);
             return list;
         }
+
+        /// <summary>Render into a caller-supplied context with the current ChartInfo/Container/visible range.</summary>
+        public void StubRenderTo(OFT.Rendering.Context.RenderContext ctx) => OnRender(ctx, DrawingLayouts.Final);
 
         public int StubRender()
         {
