@@ -52,6 +52,48 @@ Export z Footprint Exporteru:
 2. **Přepočítat A a E na adaptivní prahy:** percentil delta/objem a objemu zvlášť pro RTH a ETH, delší okno pro E.
 3. **Rozjetí** buď zmírnit, nebo nahradit vstupem na close knotové svíčky.
 
+## Optimalizace pro 5M RTH (40 session, 28. 9. – 20. 11. 2026)
+
+**Data:**
+- Export z vašeho 5M RTH grafu: 3239 svíček, 81 na session (09:30–16:15 New York).
+- Říjen byl do strany až nahoru, listopad silný pokles.
+
+**Metoda:**
+- Session jsou rozdělené střídavě na **A** (liché) a **B** (sudé), takže obě poloviny obsahují oba měsíce.
+- Prahy se ladily na A a ověřovaly na B. Kontroluje se i zvlášť září/říjen a listopad.
+- Logika Wick Absorption je přepsaná do Pythonu (`wa_model.py`) a ověřená na **100 % shodu** s C# kódem. Pak se prošlo **720 kombinací** prahů (`opt5m_sweep.py`).
+
+**Zjištění:**
+1. **Klasické čtení absorpce na 5M nefunguje, výsledky mají opačné znaménko.**
+   - Dolní knot se silným prodejem na VPOC (Bull Absorption): −2,7 bodu za 15 minut, úspěšnost 30 %, záporné v A, B, říjnu i listopadu. 68 % kombinací prahů je záporných v obou polovinách.
+   - Horní knot se silným nákupem (Bear Absorption): 79 % kombinací záporných v obou polovinách.
+   - **Strana, která byla agresivní na VPOC v knotu, měla většinou pravdu.**
+2. **„Jdi se směrem delty na VPOC v knotu“** (`opt5m_follow.py`):
+
+| Varianta | n | výhoda 15 min | A / B | září+říjen / listopad |
+|---|---|---|---|---|
+| zóna VPOC ±1 tick, \|delta\| ≥ 200, ≥ 15 % (**nové výchozí**) | 70 | **+1,8** | +3,0 / +0,6 | +0,9 / +2,6 |
+| VPOC úroveň, \|delta\| ≥ 100 (staré prahy) | 138 | +1,2 | +1,0 / +1,3 | +0,4 / +1,8 |
+| kontrola: jít s deltou celé svíčky (5 % nejsilnějších) | 148 | +0,7 | +0,4 / +0,9 | +0,8 / 0,0 |
+| kontrola: jít s deltou VPOC libovolné svíčky | 494 | +0,4 | −0,1 / +0,7 | 0,0 / +0,7 |
+
+   Podmínka „VPOC v knotu“ přidává oproti kontrolám asi +1 bod. **Statisticky to prokázané není** (t ≈ 1,6). Na polovině B, která se k ladění nepoužila, je výhoda jen +0,6.
+3. **Delta Strength Bar** (`opt5m_ae.py`):
+   - **E** nemá výhodu v žádné variantě, výsledek je kolem nuly. Označovalo 24 % svíček, proto je ve výchozím stavu vypnuté.
+   - **A s relativními prahy** (percentil za 200 svíček) vychází jako obrat +3,9 bodu a kladné ve všech částech. Je to ale jen 10 signálů.
+   - **Rozjetí** se objevilo jen 2× za 40 session.
+
+**Výsledné výchozí nastavení**, ověřené replayem C# kódu (`opt5m_verify.py`):
+
+| | n | výhoda 15 min | úspěšnost | MFE / MAE 15 min |
+|---|---|---|---|---|
+| Wick Absorption (nové) | 70 | +1,8 | 57 % | 8,7 / 7,0 |
+| Wick Absorption (staré klasické) | 138 | −1,0 | 44 % | 8,1 / 8,9 |
+| DSB knotové setupy • | 68 | +2,0 | 59 % | 8,9 / 7,0 |
+| DSB A | 10 | +3,9 | 70 % | 12,5 / 7,7 |
+
+**Realisticky:** očekávejte menší výhodu než v tabulce. Nastavení bylo vybrané na stejných datech a na ES je potřeba odečíst náklady, zhruba 0,25–0,5 bodu na obchod. Jde o lépe nastavený filtr, ne o hotovou strategii.
+
 ## Data pro optimalizaci 5M grafu
 
 - **Stačí 1M export.** 5M svíčky z něj skládá `resample_footprint.py`. Ověřeno na listopadovém exportu:
@@ -85,7 +127,33 @@ dotnet run -c Release -- data/ES5M data/ES5M_signals.csv
 python3 -I ../../.claude/skills/atas-indicator/scripts/resample_footprint.py data/ES1M_bars.csv 5 data/ES5M
 ```
 
-A vyhodnocení:
+5M optimalizace:
+
+```bash
+dotnet run -c Release -- data/R5M data/R5M_signals.csv
+```
+
+```bash
+python3 -I opt5m_parity.py
+```
+
+```bash
+python3 -I opt5m_sweep.py
+```
+
+```bash
+python3 -I opt5m_follow.py
+```
+
+```bash
+python3 -I opt5m_ae.py
+```
+
+```bash
+python3 -I opt5m_verify.py
+```
+
+Vyhodnocení 1M/5M ETH:
 
 ```bash
 python3 -I evaluate.py data/ES1M:1 data/ES5M:5

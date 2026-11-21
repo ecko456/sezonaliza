@@ -67,6 +67,15 @@ namespace DeltaStrength
         Gradient,
     }
 
+    public enum WickMove
+    {
+        [Display(Name = "Follow VPOC delta (tested on 5M RTH)")]
+        FollowVpocDelta,
+
+        [Display(Name = "Wick rejection (classic reversal)")]
+        WickRejection,
+    }
+
     public enum DeltaSignal
     {
         None = 0,
@@ -92,6 +101,7 @@ namespace DeltaStrength
         private readonly List<decimal> _strength = new();   // final value in [-1, 1]
         private readonly List<DeltaSignal> _signal = new();
         private readonly List<int> _setup = new();          // +1 bull wick setup, -1 bear, 0 none
+        private readonly List<decimal> _absRatio = new();   // |delta| / volume, for percentile ranks
 
         // calculation
         private StrengthMode _mode = StrengthMode.DeltaPercent;
@@ -115,13 +125,16 @@ namespace DeltaStrength
 
         // signals – absorption
         private bool _useAbsorption = true;
-        private decimal _absMinRatio = 0.20m;
-        private decimal _absMinRelVolume = 1.2m;
+        // Relative (percentile) thresholds: a fixed delta/volume level meant 1 bar in 100 in RTH
+        // but 1 in 4 overnight. Values from the 5M RTH study (atas/analysis/README.md).
+        private decimal _absRatioPct = 0.80m;
+        private decimal _absVolumePct = 0.70m;
+        private int _absWindow = 200;
         private decimal _absClosePosition = 0.40m;
 
         // signals – exhaustion
-        private bool _useExhaustion = true;
-        private int _exhLookback = 10;
+        private bool _useExhaustion;          // off: no edge on 5M RTH and it flagged ~24 % of bars
+        private int _exhLookback = 24;
         private bool _exhDivergence = true;
         private decimal _exhMaxSupport = 0.05m;
         private bool _exhLowVolume = true;
@@ -132,7 +145,10 @@ namespace DeltaStrength
         private bool _showSetups = true;
         private decimal _wickMinRatio = 0.35m;
         private int _wickMinTicks = 3;
-        private int _wickMinVpocDelta = 100;
+        private WickMove _wickMove = WickMove.FollowVpocDelta;
+        private int _wickZoneTicks = 1;
+        private decimal _wickMinVolShare = 0.20m;
+        private int _wickMinVpocDelta = 200;
         private decimal _wickMinVpocRatio = 0.15m;
         private int _ignitionWindow = 3;
         private decimal _ignitionMinRatio = 0.15m;
@@ -161,6 +177,7 @@ namespace DeltaStrength
         private RenderFont _glyphFont = new("Arial", 9, FontStyle.Bold);
 
         private decimal[] _volBuffer = new decimal[64];
+        private readonly List<PriceVolumeInfo> _levelBuf = new();
 
         #endregion
 
@@ -303,28 +320,39 @@ namespace DeltaStrength
         // --- Absorption
 
         [Display(Name = "A · Absorption", GroupName = "3. Signals", Order = 100,
-            Description = "Strong delta on above-average volume, but the bar closed against it (effort without result).")]
+            Description = "Unusually strong delta on unusually high volume (both ranked against the previous bars), " +
+                          "but the bar closed against the delta (effort without result).")]
         public bool UseAbsorption
         {
             get => _useAbsorption;
             set { _useAbsorption = value; RecalculateValues(); }
         }
 
-        [Display(Name = "A · Min |delta| / volume", GroupName = "3. Signals", Order = 110)]
-        [Range(0.01, 1)]
-        public decimal AbsMinRatio
+        [Display(Name = "A · |delta/volume| percentile", GroupName = "3. Signals", Order = 110,
+            Description = "0.80 = stronger than 80 % of the previous bars in the window.")]
+        [Range(0, 1)]
+        public decimal AbsRatioPercentile
         {
-            get => _absMinRatio;
-            set { _absMinRatio = Clamp(value, 0.01m, 1m); RecalculateValues(); }
+            get => _absRatioPct;
+            set { _absRatioPct = Clamp(value, 0m, 1m); RecalculateValues(); }
         }
 
-        [Display(Name = "A · Min relative volume", GroupName = "3. Signals", Order = 120,
-            Description = "1.2 = volume at least 120 % of the average.")]
-        [Range(0, 20)]
-        public decimal AbsMinRelVolume
+        [Display(Name = "A · Volume percentile", GroupName = "3. Signals", Order = 120,
+            Description = "0.70 = more volume than 70 % of the previous bars in the window.")]
+        [Range(0, 1)]
+        public decimal AbsVolumePercentile
         {
-            get => _absMinRelVolume;
-            set { _absMinRelVolume = Clamp(value, 0m, 20m); RecalculateValues(); }
+            get => _absVolumePct;
+            set { _absVolumePct = Clamp(value, 0m, 1m); RecalculateValues(); }
+        }
+
+        [Display(Name = "A · Percentile window (bars)", GroupName = "3. Signals", Order = 125,
+            Description = "200 bars ≈ 2.5 RTH sessions on 5M. No A signal until the window is full.")]
+        [Range(20, 5000)]
+        public int AbsWindow
+        {
+            get => _absWindow;
+            set { _absWindow = Math.Max(20, value); RecalculateValues(); }
         }
 
         [Display(Name = "A · Close position limit", GroupName = "3. Signals", Order = 130,
@@ -338,8 +366,9 @@ namespace DeltaStrength
 
         // --- Exhaustion
 
-        [Display(Name = "E · Exhaustion", GroupName = "3. Signals", Order = 200,
-            Description = "New N-bar high/low that the delta does not support, or made on thin volume.")]
+        [Display(Name = "E · Exhaustion (off by default)", GroupName = "3. Signals", Order = 200,
+            Description = "New N-bar high/low that the delta does not support, or made on thin volume. " +
+                          "Off by default: no edge on 5M RTH and it marked about a quarter of all bars.")]
         public bool UseExhaustion
         {
             get => _useExhaustion;
@@ -397,6 +426,33 @@ namespace DeltaStrength
             set { _useWick = value; RecalculateValues(); }
         }
 
+        [Display(Name = "▲▼ Expected move", GroupName = "3. Signals", Order = 302,
+            Description = "Follow VPOC delta: direction of the delta at the wick's VPOC (tested better on 5M RTH). " +
+                          "Wick rejection: classic reading, lower wick = up, upper wick = down.")]
+        public WickMove WickMove
+        {
+            get => _wickMove;
+            set { _wickMove = value; RecalculateValues(); }
+        }
+
+        [Display(Name = "▲▼ VPOC zone (± ticks)", GroupName = "3. Signals", Order = 303,
+            Description = "Delta is measured at the VPOC ± N ticks inside the wick. 0 = VPOC level only.")]
+        [Range(0, 20)]
+        public int WickZoneTicks
+        {
+            get => _wickZoneTicks;
+            set { _wickZoneTicks = Math.Clamp(value, 0, 20); RecalculateValues(); }
+        }
+
+        [Display(Name = "▲▼ Min wick volume share", GroupName = "3. Signals", Order = 304,
+            Description = "Volume traded in the wick / bar volume.")]
+        [Range(0, 1)]
+        public decimal WickMinVolShare
+        {
+            get => _wickMinVolShare;
+            set { _wickMinVolShare = Clamp(value, 0m, 1m); RecalculateValues(); }
+        }
+
         [Display(Name = "▲▼ Show setup markers (•)", GroupName = "3. Signals", Order = 305)]
         public bool ShowSetups
         {
@@ -420,8 +476,8 @@ namespace DeltaStrength
             set { _wickMinTicks = Math.Max(1, value); RecalculateValues(); }
         }
 
-        [Display(Name = "▲▼ Min |delta| at VPOC", GroupName = "3. Signals", Order = 330,
-            Description = "Contracts. ES RTH ~100+. Overnight / MES: lower.")]
+        [Display(Name = "▲▼ Min |delta| at VPOC zone", GroupName = "3. Signals", Order = 330,
+            Description = "Contracts. 200 for ES 5M RTH (study). Lower for 1M, overnight or MES.")]
         [Range(0, 100000)]
         public int WickMinVpocDelta
         {
@@ -429,7 +485,7 @@ namespace DeltaStrength
             set { _wickMinVpocDelta = Math.Max(0, value); RecalculateValues(); }
         }
 
-        [Display(Name = "▲▼ Min |delta| / volume at VPOC", GroupName = "3. Signals", Order = 340)]
+        [Display(Name = "▲▼ Min |delta| / volume at VPOC zone", GroupName = "3. Signals", Order = 340)]
         [Range(0, 1)]
         public decimal WickMinVpocRatio
         {
@@ -617,6 +673,7 @@ namespace DeltaStrength
                 _strength.Clear();
                 _signal.Clear();
                 _setup.Clear();
+                _absRatio.Clear();
             }
 
             EnsureSize(bar);
@@ -642,6 +699,8 @@ namespace DeltaStrength
 
             _smoothed[bar] = smoothed;
             _strength[bar] = Shape(smoothed / EffectiveSaturation);
+
+            _absRatio[bar] = candle.Volume > 0 ? Math.Abs(candle.Delta) / candle.Volume : 0m;
 
             // --- signals (setup first: ignition on later bars depends on it)
             _setup[bar] = _useWick ? DetectWickSetup(candle) : 0;
@@ -730,13 +789,15 @@ namespace DeltaStrength
                     return ignition;
             }
 
-            // 2. Absorption – effort (delta + volume) without result (close against it).
-            if (_useAbsorption && range > 0 && relVol >= _absMinRelVolume)
+            // 2. Absorption – effort (delta + volume, both unusually high for this chart) without result.
+            if (_useAbsorption && range > 0 && bar >= _absWindow
+                && PercentileRank(_absRatio, bar, _absRatio[bar]) >= _absRatioPct
+                && VolumePercentileRank(bar, candle.Volume) >= _absVolumePct)
             {
-                if (ratio >= _absMinRatio && closePos <= _absClosePosition)
+                if (ratio > 0 && closePos <= _absClosePosition)
                     return DeltaSignal.BuyersAbsorbed;
 
-                if (ratio <= -_absMinRatio && closePos >= 1m - _absClosePosition)
+                if (ratio < 0 && closePos >= 1m - _absClosePosition)
                     return DeltaSignal.SellersAbsorbed;
             }
 
@@ -770,7 +831,12 @@ namespace DeltaStrength
             return DeltaSignal.None;
         }
 
-        /// <summary>+1 / -1 when the VPOC sits in a rejected lower / upper wick with strong delta at the VPOC.</summary>
+        /// <summary>
+        /// Wick setup: the VPOC sits in a wick (≥ min share of the range and ticks, with enough of the bar's
+        /// volume) and the delta at the VPOC ± zone (inside that wick) is strong. Returns the expected
+        /// direction: sign of that delta (Follow VPOC delta) or the wick side (Wick rejection).
+        /// Same rules as Wick Absorption, so both indicators flag the same bars.
+        /// </summary>
         private int DetectWickSetup(IndicatorCandle candle)
         {
             var range = candle.High - candle.Low;
@@ -785,9 +851,11 @@ namespace DeltaStrength
             if (levels == null)
                 return 0;
 
+            _levelBuf.Clear();
             PriceVolumeInfo vpoc = null;
             foreach (var lvl in levels)
             {
+                _levelBuf.Add(lvl);
                 if (vpoc == null || lvl.Volume > vpoc.Volume)
                     vpoc = lvl;
             }
@@ -795,23 +863,79 @@ namespace DeltaStrength
             if (vpoc == null || vpoc.Volume <= 0)
                 return 0;
 
-            var vpocDelta = vpoc.Ask - vpoc.Bid;
-            var strong = Math.Abs(vpocDelta) >= _wickMinVpocDelta
-                         && Math.Abs(vpocDelta) / vpoc.Volume >= _wickMinVpocRatio
-                         && vpocDelta != 0;
+            bool lower;
+            decimal wick;
+            if (vpoc.Price < bodyLow)
+            {
+                lower = true;
+                wick = bodyLow - candle.Low;
+            }
+            else if (vpoc.Price > bodyHigh)
+            {
+                lower = false;
+                wick = candle.High - bodyHigh;
+            }
+            else
+            {
+                return 0; // VPOC in the body
+            }
 
-            if (!strong)
+            if (wick < _wickMinTicks * tick || wick / range < _wickMinRatio)
                 return 0;
 
-            var lowerWick = bodyLow - candle.Low;
-            if (vpoc.Price < bodyLow && lowerWick >= _wickMinTicks * tick && lowerWick / range >= _wickMinRatio)
-                return 1;
+            decimal wickVol = 0, zoneDelta = 0, zoneVol = 0;
+            var half = _wickZoneTicks * tick;
+            foreach (var lvl in _levelBuf)
+            {
+                var inWick = lower ? lvl.Price < bodyLow : lvl.Price > bodyHigh;
+                if (!inWick)
+                    continue;
 
-            var upperWick = candle.High - bodyHigh;
-            if (vpoc.Price > bodyHigh && upperWick >= _wickMinTicks * tick && upperWick / range >= _wickMinRatio)
-                return -1;
+                wickVol += lvl.Volume;
+                if (Math.Abs(lvl.Price - vpoc.Price) <= half)
+                {
+                    zoneDelta += lvl.Ask - lvl.Bid;
+                    zoneVol += lvl.Volume;
+                }
+            }
 
-            return 0;
+            if (wickVol <= 0 || wickVol / candle.Volume < _wickMinVolShare)
+                return 0;
+
+            var abs = Math.Abs(zoneDelta);
+            if (abs == 0 || zoneVol <= 0 || abs < _wickMinVpocDelta || abs / zoneVol < _wickMinVpocRatio)
+                return 0;
+
+            return _wickMove == WickMove.FollowVpocDelta
+                ? Math.Sign(zoneDelta)
+                : (lower ? 1 : -1);
+        }
+
+        /// <summary>Share of the previous window's values strictly below <paramref name="value"/>.</summary>
+        private decimal PercentileRank(List<decimal> series, int bar, decimal value)
+        {
+            var start = bar - _absWindow;
+            var below = 0;
+            for (var i = start; i < bar; i++)
+            {
+                if (series[i] < value)
+                    below++;
+            }
+
+            return (decimal)below / _absWindow;
+        }
+
+        private decimal VolumePercentileRank(int bar, decimal volume)
+        {
+            var start = bar - _absWindow;
+            var below = 0;
+            for (var i = start; i < bar; i++)
+            {
+                if (GetCandle(i).Volume < volume)
+                    below++;
+            }
+
+            return (decimal)below / _absWindow;
         }
 
         private DeltaSignal DetectIgnition(int bar, IndicatorCandle candle, decimal ratio, decimal closePos)
@@ -900,6 +1024,7 @@ namespace DeltaStrength
                 _strength.Add(0m);
                 _signal.Add(DeltaSignal.None);
                 _setup.Add(0);
+                _absRatio.Add(0m);
             }
         }
 

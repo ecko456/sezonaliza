@@ -14,7 +14,19 @@ Hledá obratové svíčky, u kterých se hlavní order-flow akce odehrála v kno
 | **Absorpce**: agresoři narazili na pasivní limitky | delta v knotu silně **−** | delta v knotu silně **+** |
 | **Iniciativa / pohlcení**: protistrana agresivně převzala | delta v knotu silně **+** | delta v knotu silně **−** |
 
-Na grafu se zvýrazní zóna knotu barvou podle typu signálu, čára VPOC v knotu a popisek s deltou v knotu (např. `-1.2K`).
+Na grafu se zvýrazní zóna knotu, čára VPOC v knotu a popisek s deltou (např. `-1.2K`).
+
+## Očekávaný směr (nastavení *Expected move*)
+
+- **Follow VPOC delta** (výchozí): barva ukazuje **směr delty na VPOC**. Zelená = převaha nákupů, čeká se pohyb nahoru. Červená = převaha prodejů, čeká se pohyb dolů. Strana knotu nerozhoduje.
+- **Wick rejection** (klasika): dolní knot = nahoru, horní knot = dolů. Barvy jsou podle typu (absorpce/iniciativa) jako v tabulce níže.
+
+Proč je výchozí „Follow VPOC delta“: na **40 session ES 5M RTH** se klasické čtení absorpce neosvědčilo.
+- Dolní knot se silným **prodejem** na VPOC v průměru pokračoval **dolů**: −2,7 bodu za 15 minut, úspěšnost 30 %, záporné ve všech částech dat.
+- Horní knot se silným nákupem pokračoval nahoru.
+- Čtení „jdi se směrem delty“ vyšlo na **+1,8 bodu** za 15 minut oproti náhodnému vstupu, s 57 % úspěšností a kladné v říjnu (do strany) i v listopadu (pokles).
+- Klasické čtení na stejných datech vyšlo −1,0 bodu.
+- Statisticky to prokázané není (t ≈ 1,6). Podrobnosti jsou v `atas/analysis/README.md`.
 
 Výchozí barvy:
 
@@ -33,14 +45,17 @@ Výchozí barvy:
 | | Min wick (ticks) | 3 | 3 ticky = 0.75 bodu |
 | | Require VPOC in wick | ano | |
 | | Min wick volume share | 0.20 | objem v knotu / objem svíčky |
-| Delta in wick | Measure delta at | VPOC level | VPOC level / VPOC zone / Whole wick |
-| | VPOC zone (± ticks) | 1 | jen pro VPOC zone |
+| Delta in wick | Expected move | Follow VPOC delta | nebo Wick rejection (klasika) |
+| | Measure delta at | **VPOC zone** | VPOC level / VPOC zone / Whole wick |
+| | VPOC zone (± ticks) | 1 | |
 | | Detect absorption / initiative | ano / ano | |
-| | Min \|delta\| | 100 | ES RTH na VPOC ~100+. Přes noc a na MES snižte (nebo dejte 0 a spoléhejte na poměr) |
+| | Min \|delta\| | **200** | optimum pro ES 5M RTH. Na 1M a přes noc ~100, na MES ještě méně |
 | | Min \|delta\| / volume | 0.15 | funguje v RTH i přes noc |
 | Filters | Only closed bars | ano | na živé svíčce může signál ještě zmizet |
 
-Pro jiné indikátory nebo strategie je k dispozici metoda `GetSignal(bar)`, která vrací `None`, `BullAbsorption`, `BullInitiative`, `BearAbsorption` nebo `BearInitiative`.
+Pro jiné indikátory nebo strategie jsou k dispozici metody:
+- `GetSignal(bar)` vrací typ knotu: `None`, `BullAbsorption`, `BullInitiative`, `BearAbsorption` nebo `BearInitiative`.
+- `GetExpectedDirection(bar)` vrací +1 / −1 / 0 podle nastavení *Expected move*.
 
 ## Build a instalace
 

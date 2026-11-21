@@ -32,6 +32,15 @@ using OFT.Rendering.Tools;
 
 namespace WickAbsorptionIndicator
 {
+    public enum ExpectedMove
+    {
+        [Display(Name = "Follow VPOC delta (tested on 5M RTH)")]
+        FollowVpocDelta,
+
+        [Display(Name = "Wick rejection (classic reversal)")]
+        WickRejection,
+    }
+
     public enum DeltaSource
     {
         [Display(Name = "VPOC level")]
@@ -81,9 +90,12 @@ namespace WickAbsorptionIndicator
         // delta
         private bool _detectAbsorption = true;
         private bool _detectInitiative = true;
-        private DeltaSource _deltaSource = DeltaSource.VpocLevel;
+        // Defaults from the 5M RTH study (40 sessions, Sep–Nov 2026, atas/analysis/README.md):
+        // following the VPOC delta beat the classic reversal reading; zone ±1 tick, |delta| >= 200.
+        private ExpectedMove _expectedMove = ExpectedMove.FollowVpocDelta;
+        private DeltaSource _deltaSource = DeltaSource.VpocZone;
         private int _vpocZoneTicks = 1;
-        private int _minWickDelta = 100;
+        private int _minWickDelta = 200;
         private decimal _minWickDeltaRatio = 0.15m;
 
         // filters
@@ -92,6 +104,8 @@ namespace WickAbsorptionIndicator
         private readonly List<PriceVolumeInfo> _levels = new();
 
         // visuals
+        private Color _upColor = Color.FromArgb(255, 0, 220, 120);
+        private Color _downColor = Color.FromArgb(255, 255, 45, 85);
         private Color _bullAbsorptionColor = Color.FromArgb(255, 0, 190, 255);
         private Color _bullInitiativeColor = Color.FromArgb(255, 40, 210, 90);
         private Color _bearAbsorptionColor = Color.FromArgb(255, 255, 140, 0);
@@ -144,6 +158,16 @@ namespace WickAbsorptionIndicator
         #endregion
 
         #region Settings – 2. Delta in wick
+
+        [Display(Name = "Expected move", GroupName = "2. Delta in wick", Order = 1,
+            Description = "Follow VPOC delta: the aggressive side at the wick's VPOC is expected to win " +
+                          "(colour = direction of that delta; this tested better on 5M RTH). " +
+                          "Wick rejection: classic reading, the wick side decides (lower wick = up).")]
+        public ExpectedMove ExpectedMove
+        {
+            get => _expectedMove;
+            set { _expectedMove = value; RedrawChart(); }
+        }
 
         [Display(Name = "Measure delta at", GroupName = "2. Delta in wick", Order = 5,
             Description = "VPOC level = only the VPOC price (how you read the footprint). " +
@@ -213,28 +237,42 @@ namespace WickAbsorptionIndicator
 
         #region Settings – 4. Visual
 
-        [Display(Name = "Bull absorption", GroupName = "4. Visual", Order = 10)]
+        [Display(Name = "Up (Follow VPOC delta mode)", GroupName = "4. Visual", Order = 1)]
+        public Color UpColor
+        {
+            get => _upColor;
+            set { _upColor = value; RedrawChart(); }
+        }
+
+        [Display(Name = "Down (Follow VPOC delta mode)", GroupName = "4. Visual", Order = 2)]
+        public Color DownColor
+        {
+            get => _downColor;
+            set { _downColor = value; RedrawChart(); }
+        }
+
+        [Display(Name = "Bull absorption (classic mode)", GroupName = "4. Visual", Order = 10)]
         public Color BullAbsorptionColor
         {
             get => _bullAbsorptionColor;
             set { _bullAbsorptionColor = value; RedrawChart(); }
         }
 
-        [Display(Name = "Bull initiative", GroupName = "4. Visual", Order = 20)]
+        [Display(Name = "Bull initiative (classic mode)", GroupName = "4. Visual", Order = 20)]
         public Color BullInitiativeColor
         {
             get => _bullInitiativeColor;
             set { _bullInitiativeColor = value; RedrawChart(); }
         }
 
-        [Display(Name = "Bear absorption", GroupName = "4. Visual", Order = 30)]
+        [Display(Name = "Bear absorption (classic mode)", GroupName = "4. Visual", Order = 30)]
         public Color BearAbsorptionColor
         {
             get => _bearAbsorptionColor;
             set { _bearAbsorptionColor = value; RedrawChart(); }
         }
 
-        [Display(Name = "Bear initiative", GroupName = "4. Visual", Order = 40)]
+        [Display(Name = "Bear initiative (classic mode)", GroupName = "4. Visual", Order = 40)]
         public Color BearInitiativeColor
         {
             get => _bearInitiativeColor;
@@ -303,6 +341,22 @@ namespace WickAbsorptionIndicator
         /// <summary>Signal on a bar (for strategies / other indicators).</summary>
         public WickSignal GetSignal(int bar) =>
             bar >= 0 && bar < _bars.Count ? _bars[bar].Signal : WickSignal.None;
+
+        /// <summary>+1 expected up, -1 expected down, 0 none – according to "Expected move".</summary>
+        public int GetExpectedDirection(int bar)
+        {
+            if (bar < 0 || bar >= _bars.Count || _bars[bar].Signal == WickSignal.None)
+                return 0;
+
+            var info = _bars[bar];
+            if (_expectedMove == ExpectedMove.FollowVpocDelta)
+                return Math.Sign(info.SignalDelta);
+
+            return IsLowerWick(info.Signal) ? 1 : -1;
+        }
+
+        private static bool IsLowerWick(WickSignal s) =>
+            s == WickSignal.BullAbsorption || s == WickSignal.BullInitiative;
 
         #region Calculation
 
@@ -487,7 +541,9 @@ namespace WickAbsorptionIndicator
                     width = prevWidth;
                 prevWidth = width;
 
-                var baseColor = SignalColor(info.Signal);
+                var baseColor = _expectedMove == ExpectedMove.FollowVpocDelta
+                    ? (info.SignalDelta >= 0 ? _upColor : _downColor)
+                    : SignalColor(info.Signal);
 
                 // Pixel height of one tick, to cover whole price levels.
                 var yA = ChartInfo.GetYByPrice(info.WickTop, false);
@@ -514,8 +570,7 @@ namespace WickAbsorptionIndicator
                     var text = FormatDelta(info.SignalDelta);
                     var size = context.MeasureString(text, _font);
                     var tx = x + (width - size.Width) / 2;
-                    var isBull = info.Signal == WickSignal.BullAbsorption || info.Signal == WickSignal.BullInitiative;
-                    var ty = isBull ? bottom + 2 : top - size.Height - 2;
+                    var ty = IsLowerWick(info.Signal) ? bottom + 2 : top - size.Height - 2;
 
                     context.FillRectangle(WithOpacity(baseColor, 80),
                         new Rectangle(tx - 2, ty, size.Width + 4, size.Height));

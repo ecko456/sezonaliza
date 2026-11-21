@@ -7,19 +7,24 @@ Dvoupruhová lišta pod cenou:
 
 ![Náhled](preview.png)
 
-Náhled je vykreslený kódem indikátoru na simulovaných ES svíčkách, nejde o screenshot z ATASu.
+Náhled je vykreslený kódem indikátoru na simulovaných ES svíčkách, nejde o screenshot z ATASu. Pro ukázku je zapnuté E a okno pro A je zkrácené na 20 svíček.
 
 ## Signály
 
 | Značka | Signál | Kdy vznikne |
 |---|---|---|
-| **▲** zelená / **▼** červená | **Rozjetí pohybu** | Do 3 svíček po knotovém setupu zavře svíčka za tělem knotové svíčky, s deltou ve směru (≥ 15 % objemu) a close v horních/dolních 40 % rozsahu. Pokud cena mezitím překoná konec knotu, setup se zruší. Každý setup dá nejvýš jedno rozjetí. |
-| **•** malý čtvereček | **Knot = první náznak** | VPOC svíčky leží v odmítnutém knotu (≥ 35 % rozsahu, ≥ 3 ticky) a na VPOC je silná delta (≥ 100 kontraktů a ≥ 15 % objemu úrovně). Směr určuje knot: dolní = býčí, horní = medvědí. Když má svíčka zároveň **A** nebo **E**, knot se ukáže jako tečka v rohu. |
-| **A** modrá | **Pohlcení prodávajících** (býčí) | Silný prodej (delta ≤ −20 % objemu) na nadprůměrném objemu (≥ 1,2× medián), ale svíčka zavřela v horních 40 %. Prodávající narazili na pasivní kupce. |
+| **•** malý čtvereček | **Knot = první náznak** | VPOC svíčky leží v knotu (≥ 35 % rozsahu, ≥ 3 ticky, knot má ≥ 20 % objemu svíčky) a v zóně VPOC ±1 tick je silná delta (≥ 200 kontraktů a ≥ 15 % objemu zóny). **Barva = očekávaný směr = směr té delty** (nastavení *Expected move: Follow VPOC delta*). Klasické čtení podle strany knotu (dolní = býčí) jde zapnout. Když má svíčka zároveň **A** nebo **E**, knot se ukáže jako tečka v rohu. |
+| **▲** zelená / **▼** červená | **Rozjetí pohybu** | Do 3 svíček po knotovém setupu zavře svíčka za tělem knotové svíčky ve směru setupu, s deltou ve směru (≥ 15 % objemu) a close v horních/dolních 40 % rozsahu. Pokud cena mezitím překoná opačný konec svíčky, setup se zruší. Na 5M RTH je to vzácné, 2× za 40 session. |
+| **A** modrá | **Pohlcení prodávajících** (býčí) | Delta/objem je silnější než u 80 % a objem vyšší než u 70 % posledních 200 svíček, delta je záporná, ale svíčka zavřela v horních 40 %. Prahy jsou **relativní**, takže fungují v RTH i v noci. |
 | **A** oranžová | **Pohlcení kupujících** (medvědí) | Zrcadlově: silný nákup, ale close v dolních 40 %. |
-| **E** žlutá | **Vyčerpání** | Nové high (low) za posledních 10 svíček, které delta nepodporuje (delta/objem ≤ 5 % u high, ≥ −5 % u low), nebo vzniklo na slabém objemu (≤ 0,6× medián). |
+| **E** žlutá | **Vyčerpání** (ve výchozím stavu **vypnuté**) | Nové high (low) za posledních 24 svíček bez podpory delty nebo na slabém objemu. Na 5M RTH nemělo výhodu a označovalo čtvrtinu svíček. |
 
 Když jedna svíčka splní víc podmínek, platí pořadí **rozjetí → pohlcení → vyčerpání → knot**.
+
+**Výchozí nastavení je odladěné na ES 5M RTH**: 40 session od září do listopadu 2026, postup a čísla jsou v `atas/analysis/README.md`.
+- Knotové setupy: +2,0 bodu za 15 minut oproti náhodnému vstupu, 59 % úspěšnost, kladné ve všech částech dat.
+- A: +3,9 bodu, ale jen 10 signálů.
+- Statisticky to prokázané není. Lišta teď označuje 2,7 % svíček místo 27 %.
 
 Signály se kreslí jen na **uzavřených** svíčkách, protože na živé svíčce by mohly ještě zmizet. Dá se to vypnout v nastavení.
 
@@ -49,7 +54,7 @@ Relativní objem se počítá vůči **mediánu**, ne průměru. Jedna obří sv
 | 5. Layout | Position, výška obou pruhů, Offset, Gap, Border |
 | 6. Labels | hodnoty delty v buňkách |
 
-Výchozí prahy odpovídají ES na 1–5min grafu v RTH. Přes noc a na MES snižte hlavně *Min \|delta\| at VPOC*.
+Výchozí prahy jsou pro ES 5M RTH. Na 1M, přes noc a na MES snižte hlavně *Min \|delta\| at VPOC zone*, třeba na 100.
 
 Pro strategie nebo jiné indikátory jsou k dispozici metody:
 - `GetSignal(bar)`, která vrací signál dané svíčky,

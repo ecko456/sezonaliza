@@ -19,17 +19,17 @@ static class R {
     var cols = new List<(string name, Func<int, string> get)>();
     void Dsb(string name, Action<DeltaStrengthBar> cfg) { var x = new DeltaStrengthBar(); cfg(x); x.StubRun(candles, 0, 0); cols.Add((name, i => x.GetSignal(i).ToString())); }
     void Wa(string name, Action<WickAbsorption> cfg) { var x = new WickAbsorption(); cfg(x); x.StubRun(candles, 0, 0); cols.Add((name, i => x.GetSignal(i).ToString())); }
+    void WaDir(string name, Action<WickAbsorption> cfg) { var x = new WickAbsorption(); cfg(x); x.StubRun(candles, 0, 0); cols.Add((name, i => x.GetExpectedDirection(i).ToString())); }
+    // current defaults (5M RTH study) and the previous classic defaults for comparison
     Dsb("dsb", x => { });
-    Dsb("dsb_vpoc50", x => { x.WickMinVpocDelta = 50; });
-    Dsb("dsb_vpoc200", x => { x.WickMinVpocDelta = 200; });
-    Dsb("dsb_abs30", x => { x.AbsMinRatio = 0.30m; x.AbsMinRelVolume = 1.5m; });
+    Dsb("dsb_classic", x => { x.WickMove = WickMove.WickRejection; x.WickZoneTicks = 0; x.WickMinVpocDelta = 100; x.WickMinVolShare = 0m; x.UseExhaustion = true; x.ExhLookback = 10; });
     Wa("wa", x => { });
+    WaDir("wa_dir", x => { });
+    Wa("wa_classic", x => { x.ExpectedMove = ExpectedMove.WickRejection; x.DeltaSource = DeltaSource.VpocLevel; x.MinWickDelta = 100; });
     Wa("wa_whole", x => { x.DeltaSource = DeltaSource.WholeWick; });
-    Wa("wa_zone", x => { x.DeltaSource = DeltaSource.VpocZone; });
-    Wa("wa_d50", x => { x.MinWickDelta = 50; });
-    Wa("wa_d200", x => { x.MinWickDelta = 200; });
-    Wa("wa_r25", x => { x.MinWickDeltaRatio = 0.25m; });
-    Wa("wa_novpoc", x => { x.RequireVpocInWick = false; });
+    Wa("wa_level", x => { x.DeltaSource = DeltaSource.VpocLevel; });
+    Wa("wa_d100", x => { x.MinWickDelta = 100; });
+    Wa("wa_d300", x => { x.MinWickDelta = 300; });
     using var w = new StreamWriter(outp);
     w.WriteLine("bar;" + string.Join(";", cols.Select(c => c.name)));
     for (int i = 0; i < candles.Count; i++) w.WriteLine(order[i] + ";" + string.Join(";", cols.Select(c => c.get(i))));

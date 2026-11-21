@@ -84,6 +84,8 @@ Lessons from the first real export (11 sessions, Nov 2026, see `atas/analysis/RE
 - The VPOC + delta wick filter removed the worst counter-trend hammers. No signal family had a proven edge on 11 sessions, so ask for more data before claiming one.
 - **1M export is enough for any higher timeframe.** `scripts/resample_footprint.py` rebuilds N-minute footprint bars. 5M rebuilt from 1M matched ATAS's native 5M export on 100 % of indicator signals.
 - RTH-only vs full-session data: export from the chart the user actually trades. Indicators with lookbacks (median volume, N-bar high/low) differ in the first ~30 min of RTH without the overnight bars. Wick Absorption has no lookback and is unaffected.
+- **5M RTH study (40 sessions):** the classic "absorption = reversal" reading of wick VPOC delta lost money. Following the VPOC-zone delta direction was positive in every split, at about +1.8 pts per 15 min. It is not significant (t ≈ 1.6). Defaults of both indicators now follow the delta, zone ±1, |delta| ≥ 200. E (exhaustion) had no edge and is off by default. Absorption (A) uses percentile thresholds over 200 bars.
+- For parameter sweeps, port the C# logic to Python (`atas/analysis/wa_model.py`), **prove 100 % parity** with the C# replay, then sweep. Use interleaved A/B session splits plus a regime split, and compare against simple controls before claiming an effect.
 - `pd.read_csv` turns the string "None" into NaN. Read signal files with `keep_default_na=False`.
 - Reusable pipeline: `atas/analysis/Replay.cs` runs the real indicator code on exported data, and `evaluate.py` measures forward returns against a same-session random-entry baseline.
 
